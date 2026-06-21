@@ -59,21 +59,57 @@
     }
 }
 function find {
-    param($Path='.', [string]$name, [string]$type, [switch]$Help)
-    if ($Help) { return 'Usage: find PATH -name PATTERN -type f|d' }
-    $p = Convert-BashPath $Path
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+
+    $spec = @{
+        'name' = @{ Long = 'name'; Type = 'value' }
+        'type' = @{ Long = 'type'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: find PATH -name PATTERN -type f|d [--help]'
+    }
+
+    $namePattern = $parsed.Options['name']
+    $typeFilter = $parsed.Options['type']
+
+    $path = if ($parsed.Positional.Count -gt 0) { $parsed.Positional[0] } else { '.' }
+    $p = Convert-BashPath $path
+
     $items = Get-ChildItem $p -Recurse -ErrorAction SilentlyContinue
-    if ($name) { $items = $items | Where { $_.Name -like $name } }
-    if ($type -eq 'f') { $items = $items | Where { $_ -is [System.IO.FileInfo] } }
-    if ($type -eq 'd') { $items = $items | Where { $_ -is [System.IO.DirectoryInfo] } }
+    if ($namePattern) { $items = $items | Where-Object { $_.Name -like $namePattern } }
+    if ($typeFilter -eq 'f') { $items = $items | Where-Object { $_ -is [System.IO.FileInfo] } }
+    if ($typeFilter -eq 'd') { $items = $items | Where-Object { $_ -is [System.IO.DirectoryInfo] } }
     $items.FullName
 }
 function which {
-    param([string]$Command, [switch]$a, [switch]$Help)
-    if ($Help) { return 'Usage: which [-a] COMMAND' }
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+
+    $spec = @{
+        'a' = @{ Long = 'all'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: which [-a] [--help] COMMAND'
+    }
+
+    $showAll = $parsed.Options['a'] -or $parsed.LongOptions['all']
+
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'which' -Message 'missing command name'
+        return
+    }
+
+    $Command = $parsed.Positional[0]
     $cmd = Get-Command $Command -ErrorAction SilentlyContinue
     if ($cmd) {
-        if ($a) { $cmd.Source }
-        else { $cmd.Source | Select -First 1 }
+        if ($showAll) { $cmd.Source }
+        else { $cmd.Source | Select-Object -First 1 }
     }
 }

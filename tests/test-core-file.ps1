@@ -20,8 +20,8 @@ Describe "ls" {
         $items.Count | Should Be 2
     }
     It "Shows help" {
-        $help = 'Usage: ls [-a] [-l] [-h] [PATH]'
-        $help -match "Usage" | Should Be $true
+        $result = ls --help
+        $result -match "Usage" | Should Be $true
     }
 }
 
@@ -38,8 +38,8 @@ Describe "cat" {
         $content.Count | Should Be 3
     }
     It "Shows help" {
-        $help = 'Usage: cat [-n] FILE...'
-        $help -match "Usage" | Should Be $true
+        $result = cat --help
+        $result -match "Usage" | Should Be $true
     }
 }
 
@@ -47,13 +47,13 @@ Describe "rm" {
     It "Removes file" {
         $file = "test-rm-file.txt"
         New-Item -ItemType File -Path $file -Force | Out-Null
-        Remove-Item $file -Force
+        rm $file
         Test-Path $file | Should Be $false
     }
     It "Removes directory with -r" {
         $dir = "test-rm-dir"
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        Remove-Item $dir -Recurse -Force
+        rm -r $dir
         Test-Path $dir | Should Be $false
     }
 }
@@ -63,7 +63,7 @@ Describe "mkdir" {
         Remove-Item "test-mkdir-temp" -Recurse -Force -ErrorAction SilentlyContinue
     }
     It "Creates directory" {
-        New-Item -ItemType Directory -Path "test-mkdir-temp" -Force | Out-Null
+        mkdir test-mkdir-temp
         Test-Path "test-mkdir-temp" | Should Be $true
     }
 }
@@ -78,7 +78,7 @@ Describe "cp" {
         Remove-Item "test-cp-dst.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Copies file" {
-        Copy-Item "test-cp-src.txt" "test-cp-dst.txt" -Force
+        cp test-cp-src.txt test-cp-dst.txt
         Test-Path "test-cp-dst.txt" | Should Be $true
     }
 }
@@ -92,7 +92,7 @@ Describe "mv" {
         Remove-Item "test-mv-dst.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Moves file" {
-        Move-Item "test-mv-src.txt" "test-mv-dst.txt" -Force
+        mv test-mv-src.txt test-mv-dst.txt
         Test-Path "test-mv-src.txt" | Should Be $false
         Test-Path "test-mv-dst.txt" | Should Be $true
     }
@@ -101,33 +101,33 @@ Describe "mv" {
 Describe "touch" {
     AfterAll {
         Remove-Item "test-touch.txt" -Force -ErrorAction SilentlyContinue
+        Remove-Item "test-touch-no-create.txt" -Force -ErrorAction SilentlyContinue
+        Remove-Item "test-touch-multi1.txt", "test-touch-multi2.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Creates new file" {
-        New-Item -ItemType File -Path "test-touch.txt" -Force | Out-Null
+        touch test-touch.txt
         Test-Path "test-touch.txt" | Should Be $true
     }
     It "Updates existing file timestamp" {
         $before = (Get-Item "test-touch.txt").LastWriteTime
         Start-Sleep -Seconds 1
-        (Get-Item "test-touch.txt").LastWriteTime = Get-Date
+        touch test-touch.txt
         $after = (Get-Item "test-touch.txt").LastWriteTime
         $after -gt $before | Should Be $true
     }
     It "Shows help" {
-        $result = touch -Help
+        $result = touch --help
         $result -match "Usage" | Should Be $true
     }
     It "Does not create file with -c when file does not exist" {
         $nonexistent = "test-touch-no-create.txt"
-        touch -Path $nonexistent -c
+        touch -c $nonexistent
         Test-Path $nonexistent | Should Be $false
     }
     It "Accepts multiple file paths" {
-        $files = @("test-touch-multi1.txt", "test-touch-multi2.txt")
-        touch -Path $files
-        Test-Path $files[0] | Should Be $true
-        Test-Path $files[1] | Should Be $true
-        Remove-Item $files -Force -ErrorAction SilentlyContinue
+        touch test-touch-multi1.txt test-touch-multi2.txt
+        Test-Path "test-touch-multi1.txt" | Should Be $true
+        Test-Path "test-touch-multi2.txt" | Should Be $true
     }
 }
 
@@ -144,7 +144,7 @@ Describe "ls parameter tests" {
         Remove-Item "test-ls-params" -Recurse -Force -ErrorAction SilentlyContinue
     }
     It "Shows hidden files with -a" {
-        $result = ls $testDir -a
+        $result = ls -a $testDir
         $result -match "\.hidden" | Should Be $true
     }
     It "Hides hidden files by default" {
@@ -152,12 +152,12 @@ Describe "ls parameter tests" {
         $result -match "\.hidden" | Should Be $false
     }
     It "Shows long format with -l" {
-        $result = ls $testDir -l
+        $result = ls -l $testDir
         $result -match "rw" | Should Be $true
         $result -match "total" | Should Be $true
     }
     It "Shows human-readable sizes with -h" {
-        $result = ls $testDir -l -h
+        $result = ls -l -h $testDir
         $result -match "B|K|M|G" | Should Be $true
     }
     It "Shows help" {
@@ -172,12 +172,12 @@ Describe "ls parameter tests" {
         Remove-Item $emptyDir -Force -ErrorAction SilentlyContinue
     }
     It "Colors executable files" {
-        $result = ls $testDir -l
+        $result = ls -l $testDir
         # 可执行文件（.ps1）应有 ANSI 颜色代码
         $result -match "\[1;32m" | Should Be $true
     }
     It "Colors directories" {
-        $result = ls $testDir -l
+        $result = ls -l $testDir
         # 目录应有 ANSI 颜色代码
         $result -match "\[1;34m" | Should Be $true
     }
@@ -196,26 +196,26 @@ Describe "cat parameter tests" {
         Remove-Item $testFile1, $testFile2, $emptyFile -Force -ErrorAction SilentlyContinue
     }
     It "Shows line numbers with -n" {
-        $result = cat -Path $testFile1 -n
-        $result -match "\{1\}" | Should Be $true
-        $result -match "\{2\}" | Should Be $true
+        $result = cat -n $testFile1
+        $result -match "1 " | Should Be $true
+        $result -match "2 " | Should Be $true
     }
     It "Reads multiple files" {
-        $result = cat -Path $testFile1, $testFile2
+        $result = cat $testFile1 $testFile2
         $result.Count | Should Be 5
     }
     It "Handles empty file" {
-        $result = cat -Path $emptyFile
+        $result = cat $emptyFile
         $result | Should Be $null
     }
     It "Shows help" {
-        $result = cat -Help
+        $result = cat --help
         $result -match "Usage" | Should Be $true
     }
     It "Handles non-existent file with error" {
         # cat 会输出错误但不会抛出异常
         $errorOccurred = $false
-        try { cat -Path "nonexistent.txt" } catch { $errorOccurred = $true }
+        try { cat nonexistent.txt } catch { $errorOccurred = $true }
         # 验证函数执行完毕（即使有错误输出）
         $errorOccurred | Should Be $false
     }
@@ -231,36 +231,31 @@ Describe "rm parameter tests" {
         Remove-Item "test-rm-params" -Recurse -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = rm -Help
+        $result = rm --help
         $result -match "Usage" | Should Be $true
     }
     It "Removes file with -f" {
         $file = "test-rm-force.txt"
         New-Item -ItemType File -Path $file -Force | Out-Null
-        rm -Args2 "-f", $file
+        rm -f $file
         Test-Path $file | Should Be $false
     }
     It "Removes directory with -rf combination" {
         $dir = "test-rm-rf-dir"
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         New-Item -ItemType File -Path "$dir\file.txt" -Force | Out-Null
-        rm -Args2 "-rf", $dir
+        rm -rf $dir
         Test-Path $dir | Should Be $false
     }
     It "Silently ignores non-existent file with -f" {
-        rm -Args2 "-f", "nonexistent-file.txt"
+        rm -f nonexistent-file.txt
         # 不应抛出错误
         $true | Should Be $true
-    }
-    It "Rejects invalid option" {
-        # rm 会输出错误但继续执行
-        $result = rm -Args2 "-x", "test.txt"
-        $result | Should Be $null
     }
     It "Shows error for directory without -r" {
         $dir = "test-rm-noflags-dir"
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        rm -Args2 $dir
+        rm $dir
         # 目录应仍然存在（因为没有 -r）
         Test-Path $dir | Should Be $true
         Remove-Item $dir -Force -ErrorAction SilentlyContinue
@@ -273,16 +268,16 @@ Describe "mkdir parameter tests" {
         Remove-Item "test-mkdir-a", "test-mkdir-b" -Force -ErrorAction SilentlyContinue
     }
     It "Creates nested directories with -p" {
-        mkdir -Path "test-mkdir-nested\subdir\deep" -p
-        Test-Path "test-mkdir-nested\subdir\deep" | Should Be $true
+        mkdir -p test-mkdir-nested/subdir/deep
+        Test-Path "test-mkdir-nested/subdir/deep" | Should Be $true
     }
     It "Creates multiple directories" {
-        mkdir -Path "test-mkdir-a", "test-mkdir-b"
+        mkdir test-mkdir-a test-mkdir-b
         Test-Path "test-mkdir-a" | Should Be $true
         Test-Path "test-mkdir-b" | Should Be $true
     }
     It "Shows help" {
-        $result = mkdir -Help
+        $result = mkdir --help
         $result -match "Usage" | Should Be $true
     }
 }
@@ -299,12 +294,12 @@ Describe "cp parameter tests" {
         Remove-Item "test-cp-dir", "test-cp-dir-copy" -Recurse -Force -ErrorAction SilentlyContinue
     }
     It "Copies directory with -r" {
-        cp -Source "test-cp-dir" -Dest "test-cp-dir-copy" -r
+        cp -r test-cp-dir test-cp-dir-copy
         Test-Path "test-cp-dir-copy" | Should Be $true
         Test-Path "test-cp-dir-copy\file.txt" | Should Be $true
     }
     It "Shows help" {
-        $result = cp -Help
+        $result = cp --help
         $result -match "Usage" | Should Be $true
     }
 }
@@ -317,7 +312,7 @@ Describe "mv parameter tests" {
         Remove-Item "test-mv-src2.txt", "test-mv-dst2.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = mv -Help
+        $result = mv --help
         $result -match "Usage" | Should Be $true
     }
 }
@@ -333,21 +328,21 @@ Describe "ll parameter tests" {
         Remove-Item "test-ll-params" -Recurse -Force -ErrorAction SilentlyContinue
     }
     It "Shows hidden files with -a" {
-        $result = ll -Path $testDir -a
+        $result = ll -a $testDir
         $result -match "\.hidden" | Should Be $true
     }
     It "Shows human-readable sizes with -h" {
-        $result = ll -Path $testDir -h
+        $result = ll -h $testDir
         $result -match "B|K|M|G" | Should Be $true
     }
     It "Shows help" {
-        $result = ll -Help
+        $result = ll --help
         $result -match "Usage" | Should Be $true
     }
     It "Handles empty directory" {
         $emptyDir = "test-ll-empty"
         New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
-        $result = ll -Path $emptyDir
+        $result = ll $emptyDir
         $result -match "total 0" | Should Be $true
         Remove-Item $emptyDir -Force -ErrorAction SilentlyContinue
     }

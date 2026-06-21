@@ -55,25 +55,54 @@ function Parse-BashArgs {
         elseif ($arg.StartsWith('-') -and $arg.Length -gt 1) {
             $flags = $arg.Substring(1)
 
-            if ($flags.Length -eq 1 -and $OptionSpec.ContainsKey($flags) -and $OptionSpec[$flags].Type -eq 'value') {
-                if ($i + 1 -lt $ArgsArray.Count) {
-                    $i++
-                    $value = $ArgsArray[$i]
-                    $result.Options[$flags] = $value
-                    if ($OptionSpec[$flags].Long) {
-                        $result.LongOptions[$OptionSpec[$flags].Long] = $value
+            # Check for single flag with value (e.g., -o file)
+            if ($flags.Length -eq 1) {
+                $matchedKey = $null
+                # Check if flag matches a Short attribute
+                foreach ($key in $OptionSpec.Keys) {
+                    if ($OptionSpec[$key].Short -eq $flags) {
+                        $matchedKey = $key
+                        break
                     }
                 }
-                $i++
-                continue
+                # Also check direct key match
+                if (-not $matchedKey -and $OptionSpec.ContainsKey($flags)) {
+                    $matchedKey = $flags
+                }
+
+                if ($matchedKey -and $OptionSpec[$matchedKey].Type -eq 'value') {
+                    if ($i + 1 -lt $ArgsArray.Count) {
+                        $i++
+                        $value = $ArgsArray[$i]
+                        $result.Options[$matchedKey] = $value
+                        if ($OptionSpec[$matchedKey].Long) {
+                            $result.LongOptions[$OptionSpec[$matchedKey].Long] = $value
+                        }
+                    }
+                    $i++
+                    continue
+                }
             }
 
             for ($j = 0; $j -lt $flags.Length; $j++) {
                 $flag = [string]$flags[$j]
-                if ($OptionSpec.ContainsKey($flag)) {
-                    $result.Options[$flag] = $true
-                    if ($OptionSpec[$flag].Long) {
-                        $result.LongOptions[$OptionSpec[$flag].Long] = $true
+                $matchedKey = $null
+                # Check if flag matches a Short attribute
+                foreach ($key in $OptionSpec.Keys) {
+                    if ($OptionSpec[$key].Short -eq $flag) {
+                        $matchedKey = $key
+                        break
+                    }
+                }
+                # Also check direct key match
+                if (-not $matchedKey -and $OptionSpec.ContainsKey($flag)) {
+                    $matchedKey = $flag
+                }
+
+                if ($matchedKey) {
+                    $result.Options[$matchedKey] = $true
+                    if ($OptionSpec[$matchedKey].Long) {
+                        $result.LongOptions[$OptionSpec[$matchedKey].Long] = $true
                     }
                 }
             }
