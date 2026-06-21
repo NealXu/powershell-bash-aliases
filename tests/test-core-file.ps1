@@ -1,8 +1,9 @@
 # tests\test-core-file.ps1 (兼容 Pester 3.4.0)
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $scriptDir "..\utils.ps1")
-. (Join-Path $scriptDir "..\core-file.ps1")
+
+# Import module to get properly exported functions
+Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
 
 Describe "ls" {
     BeforeAll {
@@ -143,40 +144,40 @@ Describe "ls parameter tests" {
         Remove-Item "test-ls-params" -Recurse -Force -ErrorAction SilentlyContinue
     }
     It "Shows hidden files with -a" {
-        $result = ls -Path $testDir -a
+        $result = ls $testDir -a
         $result -match "\.hidden" | Should Be $true
     }
     It "Hides hidden files by default" {
-        $result = ls -Path $testDir
+        $result = ls $testDir
         $result -match "\.hidden" | Should Be $false
     }
     It "Shows long format with -l" {
-        $result = ls -Path $testDir -l
+        $result = ls $testDir -l
         $result -match "rw" | Should Be $true
         $result -match "total" | Should Be $true
     }
     It "Shows human-readable sizes with -h" {
-        $result = ls -Path $testDir -l -h
+        $result = ls $testDir -l -h
         $result -match "B|K|M|G" | Should Be $true
     }
     It "Shows help" {
-        $result = ls -Help
+        $result = ls --help
         $result -match "Usage" | Should Be $true
     }
     It "Handles empty directory" {
         $emptyDir = "test-ls-empty"
         New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
-        $result = ls -Path $emptyDir
+        $result = ls $emptyDir
         $result | Should Be ''
         Remove-Item $emptyDir -Force -ErrorAction SilentlyContinue
     }
     It "Colors executable files" {
-        $result = ls -Path $testDir -l
+        $result = ls $testDir -l
         # 可执行文件（.ps1）应有 ANSI 颜色代码
         $result -match "\[1;32m" | Should Be $true
     }
     It "Colors directories" {
-        $result = ls -Path $testDir -l
+        $result = ls $testDir -l
         # 目录应有 ANSI 颜色代码
         $result -match "\[1;34m" | Should Be $true
     }

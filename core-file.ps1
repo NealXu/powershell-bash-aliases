@@ -1,59 +1,85 @@
 function ls {
-    param($Path='.', [switch]$a, [switch]$l, [switch]$h, [switch]$Help)
-    if ($Help) { return 'Usage: ls [-a] [-l] [-h] [PATH]' }
-    $Path = Convert-BashPath $Path
-    $items = Get-ChildItem $Path -Force:$a | Sort-Object { $_.Name }
-    if (-not $a) { $items = $items | Where-Object { -not $_.Name.StartsWith('.') } }
-    if ($l) {
-        # ANSI color codes (matching WSL dircolors defaults)
-        $E = [char]27
-        $C_DIR = "$E[1;34m"   # bold blue - directories
-        $C_EXE = "$E[1;32m"   # bold green - executables
-        $C_LNK = "$E[1;36m"   # bold cyan - symlinks
-        $C_RST = "$E[0m"
-        $exeExts = @('.exe','.bat','.cmd','.ps1','.sh','.py','.pl','.rb')
-        # Collect rows first to determine column widths
-        $rows = @()
-        foreach ($item in $items) {
-            $m = Format-UnixMode $item
-            $links = if ($item -is [System.IO.DirectoryInfo]) { 2 } else { 1 }
-            $owner = $item.GetAccessControl().Owner.Split('\')[-1]
-            $s = if ($item -is [System.IO.DirectoryInfo]) { 4096 } else { $item.Length }
-            $sz = Format-FileSize $s -HumanReadable:$h
-            $t = Format-FileTime $item.LastWriteTime
-            $isDir = $item -is [System.IO.DirectoryInfo]
-            $isExe = -not $isDir -and $exeExts -contains $item.Extension.ToLower()
-            $color = if ($isDir) { $C_DIR } elseif ($isExe) { $C_EXE } else { '' }
-            $rows += [PSCustomObject]@{
-                Mode=$m; Links=$links; Owner=$owner; Group=$owner; Size=$sz; Time=$t; Name=$item.Name; Color=$color
-            }
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+
+    $spec = @{
+        'a' = @{ Long = 'all'; Type = 'switch' }
+        'l' = @{ Long = 'long'; Type = 'switch' }
+        'h' = @{ Long = 'human-readable'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: ls [-a] [-l] [-h] [--help] [PATH]'
+    }
+
+    $showAll = $parsed.Options['a'] -or $parsed.LongOptions['all']
+    $longFormat = $parsed.Options['l'] -or $parsed.LongOptions['long']
+    $humanReadable = $parsed.Options['h'] -or $parsed.LongOptions['human-readable']
+
+    $paths = $parsed.Positional
+    if ($paths.Count -eq 0) { $paths = @('.') }
+
+    foreach ($Path in $paths) {
+        $Path = Convert-BashPath $Path
+        if (-not (Test-Path $Path)) {
+            Write-BashError -Command 'ls' -Message "cannot access '$Path'"
+            continue
         }
-        # Compute column widths (right-aligned for links, size; left-aligned for owner, group)
-        $wLinks = ($rows | ForEach { "$($_.Links)".Length } | Measure -Max).Maximum
-        $wOwner = ($rows | ForEach { $_.Owner.Length } | Measure -Max).Maximum
-        $wGroup = ($rows | ForEach { $_.Group.Length } | Measure -Max).Maximum
-        $wSize  = ($rows | ForEach { $_.Size.Length } | Measure -Max).Maximum
-        # Total line
-        $totalSize = ($items | ForEach {
-            if ($_ -is [System.IO.DirectoryInfo]) { 4096 } else { $_.Length }
-        } | Measure -Sum).Sum
-        if (-not $totalSize) { $totalSize = 0 }
-        Write-Output "total $([Math]::Ceiling($totalSize / 1024))"
-        # Format rows with alignment and color
-        foreach ($r in $rows) {
-            $linkStr = "$($r.Links)".PadLeft($wLinks)
-            $ownerStr = $r.Owner.PadRight($wOwner)
-            $groupStr = $r.Group.PadRight($wGroup)
-            $sizeStr = $r.Size.PadLeft($wSize)
-            $prefix = "$($r.Mode) $linkStr $ownerStr $groupStr $sizeStr $($r.Time) "
-            if ($r.Color) {
-                Write-Output "$prefix$($r.Color)$($r.Name)$C_RST"
-            } else {
-                Write-Output "$prefix$($r.Name)"
+        $items = Get-ChildItem $Path -Force:$showAll | Sort-Object { $_.Name }
+        if (-not $showAll) { $items = $items | Where-Object { -not $_.Name.StartsWith('.') } }
+        if ($longFormat) {
+            # ANSI color codes (matching WSL dircolors defaults)
+            $E = [char]27
+            $C_DIR = "$E[1;34m"   # bold blue - directories
+            $C_EXE = "$E[1;32m"   # bold green - executables
+            $C_LNK = "$E[1;36m"   # bold cyan - symlinks
+            $C_RST = "$E[0m"
+            $exeExts = @('.exe','.bat','.cmd','.ps1','.sh','.py','.pl','.rb')
+            # Collect rows first to determine column widths
+            $rows = @()
+            foreach ($item in $items) {
+                $m = Format-UnixMode $item
+                $links = if ($item -is [System.IO.DirectoryInfo]) { 2 } else { 1 }
+                $owner = $item.GetAccessControl().Owner.Split('\')[-1]
+                $s = if ($item -is [System.IO.DirectoryInfo]) { 4096 } else { $item.Length }
+                $sz = Format-FileSize $s -HumanReadable:$humanReadable
+                $t = Format-FileTime $item.LastWriteTime
+                $isDir = $item -is [System.IO.DirectoryInfo]
+                $isExe = -not $isDir -and $exeExts -contains $item.Extension.ToLower()
+                $color = if ($isDir) { $C_DIR } elseif ($isExe) { $C_EXE } else { '' }
+                $rows += [PSCustomObject]@{
+                    Mode=$m; Links=$links; Owner=$owner; Group=$owner; Size=$sz; Time=$t; Name=$item.Name; Color=$color
+                }
             }
+            # Compute column widths (right-aligned for links, size; left-aligned for owner, group)
+            $wLinks = if ($rows.Count) { ($rows | ForEach { "$($_.Links)".Length } | Measure -Max).Maximum } else { 1 }
+            $wOwner = if ($rows.Count) { ($rows | ForEach { $_.Owner.Length } | Measure -Max).Maximum } else { 1 }
+            $wGroup = if ($rows.Count) { ($rows | ForEach { $_.Group.Length } | Measure -Max).Maximum } else { 1 }
+            $wSize  = if ($rows.Count) { ($rows | ForEach { $_.Size.Length } | Measure -Max).Maximum } else { 1 }
+            # Total line
+            $totalSize = ($items | ForEach {
+                if ($_ -is [System.IO.DirectoryInfo]) { 4096 } else { $_.Length }
+            } | Measure -Sum).Sum
+            if (-not $totalSize) { $totalSize = 0 }
+            Write-Output "total $([Math]::Ceiling($totalSize / 1024))"
+            # Format rows with alignment and color
+            foreach ($r in $rows) {
+                $linkStr = "$($r.Links)".PadLeft($wLinks)
+                $ownerStr = $r.Owner.PadRight($wOwner)
+                $groupStr = $r.Group.PadRight($wGroup)
+                $sizeStr = $r.Size.PadLeft($wSize)
+                $prefix = "$($r.Mode) $linkStr $ownerStr $groupStr $sizeStr $($r.Time) "
+                if ($r.Color) {
+                    Write-Output "$prefix$($r.Color)$($r.Name)$C_RST"
+                } else {
+                    Write-Output "$prefix$($r.Name)"
+                }
+            }
+        } else {
+            Format-Columns $items.Name
         }
-    } else {
-        Format-Columns $items.Name
     }
 }
 function cat {
