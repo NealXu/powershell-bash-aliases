@@ -46,31 +46,72 @@ function tail {
     }
 }
 function wc {
-    param([string[]]$Path, [switch]$l, [switch]$w, [switch]$c, [switch]$Help)
-    if ($Help) { return 'Usage: wc [-l] [-w] [-c] FILE...' }
-    foreach ($f in $Path) {
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+
+    $spec = @{
+        'l' = @{ Long = 'lines'; Type = 'switch' }
+        'w' = @{ Long = 'words'; Type = 'switch' }
+        'c' = @{ Long = 'bytes'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: wc [-l] [-w] [-c] [--help] FILE...'
+    }
+
+    $showLines = $parsed.Options['l'] -or $parsed.LongOptions['lines']
+    $showWords = $parsed.Options['w'] -or $parsed.LongOptions['words']
+    $showBytes = $parsed.Options['c'] -or $parsed.LongOptions['bytes']
+
+    foreach ($f in $parsed.Positional) {
         $fp = Convert-BashPath $f
         $content = Get-Content $fp
-        $lines = $content.Count
-        $words = ($content | ForEach { $_.Split(' ') } | Measure).Count
-        $chars = ($content | Measure -Property Length -Sum).Sum
-        if (-not $l -and -not $w -and -not $c) { Write-Output "$lines $words $chars $f" }
-        else {
+        $lineCount = $content.Count
+        $wordCount = ($content | ForEach { $_.Split(' ') } | Measure-Object).Count
+        $byteCount = ($content | Measure-Object -Property Length -Sum).Sum
+
+        if (-not $showLines -and -not $showWords -and -not $showBytes) {
+            Write-Output "$lineCount $wordCount $byteCount $f"
+        } else {
             $out = ''
-            if ($l) { $out += "$lines " }
-            if ($w) { $out += "$words " }
-            if ($c) { $out += "$chars " }
-            Write-Output "$out$f" 
+            if ($showLines) { $out += "$lineCount " }
+            if ($showWords) { $out += "$wordCount " }
+            if ($showBytes) { $out += "$byteCount " }
+            Write-Output "$out$f"
         }
     }
 }
 function sort {
-    param([string[]]$Path, [switch]$n, [switch]$r, [switch]$u, [switch]$Help)
-    if ($Help) { return 'Usage: sort [-n] [-r] [-u] FILE' }
-    $content = if ($Path) { Get-Content (Convert-BashPath $Path[0]) } else { $input }
-    $sorted = if ($n) { $content | Sort {[double]$_} } else { $content | Sort }
-    if ($r) { $sorted = $sorted | Sort -Descending }
-    if ($u) { $sorted = $sorted | Get-Unique }
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+
+    $spec = @{
+        'n' = @{ Long = 'numeric'; Type = 'switch' }
+        'r' = @{ Long = 'reverse'; Type = 'switch' }
+        'u' = @{ Long = 'unique'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: sort [-n] [-r] [-u] [--help] [FILE]'
+    }
+
+    $numeric = $parsed.Options['n'] -or $parsed.LongOptions['numeric']
+    $reverse = $parsed.Options['r'] -or $parsed.LongOptions['reverse']
+    $unique = $parsed.Options['u'] -or $parsed.LongOptions['unique']
+
+    if ($parsed.Positional.Count -gt 0) {
+        $content = Get-Content (Convert-BashPath $parsed.Positional[0])
+    } else {
+        $content = $input
+    }
+
+    $sorted = if ($numeric) { $content | Sort-Object {[double]$_} } else { $content | Sort-Object }
+    if ($reverse) { $sorted = $sorted | Sort-Object -Descending }
+    if ($unique) { $sorted = $sorted | Get-Unique }
     $sorted
 }
 function uniq {
