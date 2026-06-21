@@ -2,6 +2,7 @@
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "..\utils.ps1")
+. (Join-Path $scriptDir "..\args-parser.ps1")
 . (Join-Path $scriptDir "..\core-view.ps1")
 
 Describe "less" {
