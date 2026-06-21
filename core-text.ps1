@@ -1,13 +1,49 @@
 ﻿function head {
-    param($Path, [int]$n=10, [switch]$Help)
-    if ($Help) { return 'Usage: head [-n N] FILE' }
-    if ($Path) { Get-Content (Convert-BashPath $Path) | Select -First $n }
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+
+    $spec = @{
+        'n' = @{ Long = 'lines'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: head [-n N] [--help] FILE'
+    }
+
+    $lines = $parsed.Options['n']
+    if (-not $lines) { $lines = 10 }
+
+    if ($parsed.Positional.Count -gt 0) {
+        $path = Convert-BashPath $parsed.Positional[0]
+        Get-Content $path | Select-Object -First ([int]$lines)
+    }
 }
 function tail {
-    param($Path, [int]$n=10, [switch]$f, [switch]$Help)
-    if ($Help) { return 'Usage: tail [-n N] [-f] FILE' }
-    $p = Convert-BashPath $Path
-    if ($f) { Get-Content $p -Wait } else { Get-Content $p | Select -Last $n }
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+
+    $spec = @{
+        'n' = @{ Long = 'lines'; Type = 'value' }
+        'f' = @{ Long = 'follow'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: tail [-n N] [-f] [--help] FILE'
+    }
+
+    $lines = $parsed.Options['n']
+    if (-not $lines) { $lines = 10 }
+    $follow = $parsed.Options['f'] -or $parsed.LongOptions['follow']
+
+    if ($parsed.Positional.Count -gt 0) {
+        $path = Convert-BashPath $parsed.Positional[0]
+        if ($follow) { Get-Content $path -Wait }
+        else { Get-Content $path | Select-Object -Last ([int]$lines) }
+    }
 }
 function wc {
     param([string[]]$Path, [switch]$l, [switch]$w, [switch]$c, [switch]$Help)
