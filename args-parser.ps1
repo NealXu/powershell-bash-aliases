@@ -55,6 +55,43 @@ function Parse-BashArgs {
         elseif ($arg.StartsWith('-') -and $arg.Length -gt 1) {
             $flags = $arg.Substring(1)
 
+            # Check if the whole flags string matches a spec key directly
+            # (e.g., -name, -type in find command)
+            $wholeMatchKey = $null
+            foreach ($key in $OptionSpec.Keys) {
+                if ($key -eq $flags) {
+                    $wholeMatchKey = $key
+                    break
+                }
+            }
+
+            if ($wholeMatchKey) {
+                # Whole -word matches a spec key (e.g., -name, -type)
+                if ($OptionSpec[$wholeMatchKey].Type -eq 'value') {
+                    if ($i + 1 -lt $ArgsArray.Count -and $ArgsArray[$i + 1] -notmatch '^-') {
+                        $i++
+                        $value = $ArgsArray[$i]
+                        $result.Options[$wholeMatchKey] = $value
+                        if ($OptionSpec[$wholeMatchKey].Long) {
+                            $result.LongOptions[$OptionSpec[$wholeMatchKey].Long] = $value
+                        }
+                    } else {
+                        # Next arg is a flag, treat as switch
+                        $result.Options[$wholeMatchKey] = $true
+                        if ($OptionSpec[$wholeMatchKey].Long) {
+                            $result.LongOptions[$OptionSpec[$wholeMatchKey].Long] = $true
+                        }
+                    }
+                } else {
+                    $result.Options[$wholeMatchKey] = $true
+                    if ($OptionSpec[$wholeMatchKey].Long) {
+                        $result.LongOptions[$OptionSpec[$wholeMatchKey].Long] = $true
+                    }
+                }
+                $i++
+                continue
+            }
+
             # Check for single flag with value (e.g., -o file)
             if ($flags.Length -eq 1) {
                 $matchedKey = $null
@@ -71,12 +108,18 @@ function Parse-BashArgs {
                 }
 
                 if ($matchedKey -and $OptionSpec[$matchedKey].Type -eq 'value') {
-                    if ($i + 1 -lt $ArgsArray.Count) {
+                    if ($i + 1 -lt $ArgsArray.Count -and $ArgsArray[$i + 1] -notmatch '^-') {
                         $i++
                         $value = $ArgsArray[$i]
                         $result.Options[$matchedKey] = $value
                         if ($OptionSpec[$matchedKey].Long) {
                             $result.LongOptions[$OptionSpec[$matchedKey].Long] = $value
+                        }
+                    } else {
+                        # Next arg is a flag, treat as switch
+                        $result.Options[$matchedKey] = $true
+                        if ($OptionSpec[$matchedKey].Long) {
+                            $result.LongOptions[$OptionSpec[$matchedKey].Long] = $true
                         }
                     }
                     $i++

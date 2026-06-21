@@ -135,6 +135,7 @@ Describe "ls parameter tests" {
     BeforeAll {
         $testDir = "test-ls-params"
         New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+        New-Item -ItemType Directory -Path "$testDir/subdir" -Force | Out-Null
         New-Item -ItemType File -Path "$testDir\.hidden" -Force | Out-Null
         New-Item -ItemType File -Path "$testDir\visible.txt" -Force | Out-Null
         New-Item -ItemType File -Path "$testDir\script.ps1" -Force | Out-Null

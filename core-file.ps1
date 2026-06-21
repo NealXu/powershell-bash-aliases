@@ -1,5 +1,16 @@
-function ls {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+﻿function ls {
+    # PowerShell 参数绑定：先声明可能的参数名，避免被解析为未知参数
+    param(
+        [switch]$a, [switch]$l, [switch]$h,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    # 合并所有参数到数组
+    $allArgs = @()
+    if ($a) { $allArgs += '-a' }
+    if ($l) { $allArgs += '-l' }
+    if ($h) { $allArgs += '-h' }
+    $allArgs += $ArgList
 
     $spec = @{
         'a' = @{ Long = 'all'; Type = 'switch' }
@@ -8,7 +19,7 @@ function ls {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: ls [-a] [-l] [-h] [--help] [PATH]'
@@ -83,14 +94,22 @@ function ls {
     }
 }
 function cat {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$n, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($n) { $allArgs += '-n' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'n' = @{ Long = 'number'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: cat [-n] [--help] FILE...'
@@ -116,7 +135,16 @@ function cat {
     }
 }
 function rm {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$r, [switch]$f, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($r) { $allArgs += '-r' }
+    if ($f) { $allArgs += '-f' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'r' = @{ Long = 'recursive'; Type = 'switch' }
@@ -124,7 +152,7 @@ function rm {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: rm [-r] [-f] [-rf] [--help] FILE...'
@@ -164,14 +192,22 @@ function rm {
     }
 }
 function mkdir {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$p,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    # 合并参数
+    $allArgs = @()
+    if ($p) { $allArgs += '-p' }
+    $allArgs += $ArgList
 
     $spec = @{
         'p' = @{ Long = 'parents'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: mkdir [-p] [--help] DIR...'
@@ -189,7 +225,16 @@ function mkdir {
     }
 }
 function cp {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$r, [switch]$f, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($r) { $allArgs += '-r' }
+    if ($f) { $allArgs += '-f' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'r' = @{ Long = 'recursive'; Type = 'switch' }
@@ -197,7 +242,7 @@ function cp {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: cp [-r] [-f] [--help] SOURCE DEST'
@@ -216,13 +261,20 @@ function cp {
     Copy-Item $source $dest -Recurse:$recursive -Force:$force
 }
 function mv {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: mv [--help] SOURCE DEST'
@@ -238,14 +290,22 @@ function mv {
     Move-Item $source $dest -Force
 }
 function touch {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$c, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($c) { $allArgs += '-c' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'c' = @{ Long = 'no-create'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: touch [-c] [--help] FILE...'
@@ -263,7 +323,16 @@ function touch {
     }
 }
 function ll {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$a, [switch]$h,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    # 合并参数
+    $allArgs = @()
+    if ($a) { $allArgs += '-a' }
+    if ($h) { $allArgs += '-h' }
+    $allArgs += $ArgList
 
     $spec = @{
         'a' = @{ Long = 'all'; Type = 'switch' }
@@ -271,7 +340,7 @@ function ll {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: ll [-a] [-h] [--help] [PATH] (equivalent to ls -la)'
@@ -334,3 +403,5 @@ function ll {
         }
     }
 }
+
+

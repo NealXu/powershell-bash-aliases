@@ -1,5 +1,15 @@
-﻿function curl {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+function curl {
+    param(
+        [switch]$O, [switch]$out, [switch]$I, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($O) { $allArgs += '-O' }
+    if ($o) { $allArgs += '-o' }
+    if ($I) { $allArgs += '-I' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'remote_name' = @{ Long = 'remote-name'; Short = 'O'; Type = 'switch' }
@@ -8,7 +18,7 @@
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: curl [-O] [-o FILE] [-I] [--help] URL'
@@ -39,14 +49,22 @@
     }
 }
 function ping {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$c, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($c) { $allArgs += '-c' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'c' = @{ Long = 'count'; Type = 'value'; DefaultValue = 4 }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: ping [-c N] [--help] HOST'
@@ -66,7 +84,17 @@ function ping {
     }
 }
 function netstat {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$t, [switch]$u, [switch]$n, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($t) { $allArgs += '-t' }
+    if ($u) { $allArgs += '-u' }
+    if ($n) { $allArgs += '-n' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         't' = @{ Long = 'tcp'; Type = 'switch' }
@@ -75,15 +103,11 @@ function netstat {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: netstat [-t] [-u] [-n] [--help]'
     }
-
-    $showTcp = $parsed.Options['t'] -or $parsed.LongOptions['tcp']
-    $showUdp = $parsed.Options['u'] -or $parsed.LongOptions['udp']
-    $numericOnly = $parsed.Options['n'] -or $parsed.LongOptions['numeric']
 
     $conns = Get-NetTCPConnection -ErrorAction SilentlyContinue
     if (-not $conns) {
@@ -100,7 +124,16 @@ function netstat {
     }
 }
 function wget {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$O, [switch]$q, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($O) { $allArgs += '-O' }
+    if ($q) { $allArgs += '-q' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'O' = @{ Long = 'output-document'; Type = 'value' }
@@ -108,7 +141,7 @@ function wget {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: wget [-O FILE] [-q] [--help] URL'

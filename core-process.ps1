@@ -1,5 +1,15 @@
-﻿function ps {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+function ps {
+    param(
+        [switch]$e, [switch]$f, [switch]$u, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($e) { $allArgs += '-e' }
+    if ($f) { $allArgs += '-f' }
+    if ($u) { $allArgs += '-u' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'e' = @{ Long = 'everyone'; Type = 'switch' }
@@ -8,7 +18,7 @@
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: ps [-e] [-f] [-u USER] [--help]'
@@ -31,14 +41,22 @@
     }
 }
 function kill {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$l, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($l) { $allArgs += '-l' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'l' = @{ Long = 'list'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: kill [-l] [--help] PID|NAME'
@@ -60,13 +78,20 @@ function kill {
     }
 }
 function killall {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: killall [--help] NAME'
@@ -81,14 +106,22 @@ function killall {
     Stop-Process -Name $name -Force -ErrorAction SilentlyContinue
 }
 function top {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$n, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($n) { $allArgs += '-n' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'n' = @{ Long = 'lines'; Type = 'value'; DefaultValue = 10 }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: top [-n N] [--help]'

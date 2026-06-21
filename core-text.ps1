@@ -1,12 +1,19 @@
-﻿function head {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+function head {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'n' = @{ Long = 'lines'; Type = 'value' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: head [-n N] [--help] FILE'
@@ -21,7 +28,15 @@
     }
 }
 function tail {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$f, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($f) { $allArgs += '-f' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'n' = @{ Long = 'lines'; Type = 'value' }
@@ -29,7 +44,7 @@ function tail {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: tail [-n N] [-f] [--help] FILE'
@@ -46,7 +61,17 @@ function tail {
     }
 }
 function wc {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$l, [switch]$w, [switch]$c, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($l) { $allArgs += '-l' }
+    if ($w) { $allArgs += '-w' }
+    if ($c) { $allArgs += '-c' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'l' = @{ Long = 'lines'; Type = 'switch' }
@@ -55,7 +80,7 @@ function wc {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: wc [-l] [-w] [-c] [--help] FILE...'
@@ -69,7 +94,7 @@ function wc {
         $fp = Convert-BashPath $f
         $content = Get-Content $fp
         $lineCount = $content.Count
-        $wordCount = ($content | ForEach { $_.Split(' ') } | Measure-Object).Count
+        $wordCount = ($content | ForEach-Object { $_.Split(' ') } | Measure-Object).Count
         $byteCount = ($content | Measure-Object -Property Length -Sum).Sum
 
         if (-not $showLines -and -not $showWords -and -not $showBytes) {
@@ -84,7 +109,17 @@ function wc {
     }
 }
 function sort {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$n, [switch]$r, [switch]$u, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($n) { $allArgs += '-n' }
+    if ($r) { $allArgs += '-r' }
+    if ($u) { $allArgs += '-u' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'n' = @{ Long = 'numeric'; Type = 'switch' }
@@ -93,7 +128,7 @@ function sort {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: sort [-n] [-r] [-u] [--help] [FILE]'
@@ -115,7 +150,16 @@ function sort {
     $sorted
 }
 function uniq {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$c, [switch]$d, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($c) { $allArgs += '-c' }
+    if ($d) { $allArgs += '-d' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'c' = @{ Long = 'count'; Type = 'switch' }
@@ -123,7 +167,7 @@ function uniq {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: uniq [-c] [-d] [--help]'
@@ -144,7 +188,10 @@ function uniq {
     }
 }
 function cut {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$d, [switch]$f, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
 
     $spec = @{
         'd' = @{ Long = 'delimiter'; Type = 'value'; DefaultValue = ' ' }
@@ -152,7 +199,15 @@ function cut {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    # Pair value switches with values from ArgList
+    $remaining = @($ArgList)
+    $allArgs = @()
+    if ($d) { $allArgs += '-d'; if ($remaining.Count -gt 0) { $allArgs += $remaining[0]; $remaining = $remaining[1..($remaining.Count-1)] } }
+    if ($f) { $allArgs += '-f'; if ($remaining.Count -gt 0) { $allArgs += $remaining[0]; $remaining = $remaining[1..($remaining.Count-1)] } }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $remaining
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: cut -d DELIM -f FIELDS [--help] FILE'
@@ -185,14 +240,22 @@ function cut {
     }
 }
 function tr {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$d, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($d) { $allArgs += '-d' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'd' = @{ Long = 'delete'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: tr SET1 SET2 | tr -d SET1 [--help]'
@@ -200,9 +263,7 @@ function tr {
 
     $deleteMode = $parsed.Options['d'] -or $parsed.LongOptions['delete']
 
-    # 位置参数是 SET1 和 SET2
     if ($deleteMode) {
-        # tr -d SET1
         if ($parsed.Positional.Count -eq 0) {
             Write-BashError -Command 'tr' -Message 'missing SET1'
             return
@@ -214,7 +275,6 @@ function tr {
         }
         Write-Output $content
     } else {
-        # tr SET1 SET2
         if ($parsed.Positional.Count -lt 2) {
             Write-BashError -Command 'tr' -Message 'missing SET2'
             return

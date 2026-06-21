@@ -3,11 +3,19 @@
 # CodeGraph MCP index directory
 .codegraph/
 
+# Claude Code working directory
+.claude/
+
 # Test temporary files (at root level only)
 /test-*.txt
 /test-*.ps1
+/debug-*.ps1
 test-*-temp/
 test-*-params/
+
+# Pester test result files
+test-results*.xml
+test-failures*.xml
 
 # Allow test files in tests/ directory
 !tests/

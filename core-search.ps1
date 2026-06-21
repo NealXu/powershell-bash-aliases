@@ -1,5 +1,17 @@
-﻿function grep {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args2)
+function grep {
+    param(
+        [switch]$i, [switch]$v, [switch]$n, [switch]$c, [switch]$l, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($i) { $allArgs += '-i' }
+    if ($v) { $allArgs += '-v' }
+    if ($n) { $allArgs += '-n' }
+    if ($c) { $allArgs += '-c' }
+    if ($l) { $allArgs += '-l' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'i' = @{ Long = 'ignore-case'; Type = 'switch' }
@@ -10,7 +22,7 @@
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args2 -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: grep [-i] [-v] [-n] [-c] [-l] [--help] PATTERN [FILE]...'
@@ -42,7 +54,7 @@
         $lineNum = 1
 
         foreach ($line in $content) {
-            $isMatch = if ($ignoreCase) { $line -imatch $pattern } else { $line -match $pattern }
+            $isMatch = if ($ignoreCase) { $line -imatch $pattern } else { $line -cmatch $pattern }
             if ($isMatch -and -not $invertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
             elseif (-not $isMatch -and $invertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
             $lineNum++
@@ -59,7 +71,14 @@
     }
 }
 function find {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'name' = @{ Long = 'name'; Type = 'value' }
@@ -67,7 +86,7 @@ function find {
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: find PATH -name PATTERN -type f|d [--help]'
@@ -79,21 +98,32 @@ function find {
     $path = if ($parsed.Positional.Count -gt 0) { $parsed.Positional[0] } else { '.' }
     $p = Convert-BashPath $path
 
-    $items = Get-ChildItem $p -Recurse -ErrorAction SilentlyContinue
+    $rootItem = Get-Item $p -ErrorAction SilentlyContinue
+    $items = @()
+    if ($rootItem) { $items = @($rootItem) }
+    $items += @(Get-ChildItem $p -Recurse -ErrorAction SilentlyContinue)
     if ($namePattern) { $items = $items | Where-Object { $_.Name -like $namePattern } }
     if ($typeFilter -eq 'f') { $items = $items | Where-Object { $_ -is [System.IO.FileInfo] } }
     if ($typeFilter -eq 'd') { $items = $items | Where-Object { $_ -is [System.IO.DirectoryInfo] } }
     $items.FullName
 }
 function which {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [switch]$a, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($a) { $allArgs += '-a' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
 
     $spec = @{
         'a' = @{ Long = 'all'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $Args -OptionSpec $spec
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
         return 'Usage: which [-a] [--help] COMMAND'
