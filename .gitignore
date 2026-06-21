@@ -3,11 +3,14 @@
 # CodeGraph MCP index directory
 .codegraph/
 
-# Test temporary files
-test-*.txt
-test-*.ps1
+# Test temporary files (at root level only)
+/test-*.txt
+/test-*.ps1
 test-*-temp/
 test-*-params/
+
+# Allow test files in tests/ directory
+!tests/
 
 # PowerShell session and profile backups
 *.ps1.bak
