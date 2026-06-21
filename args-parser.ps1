@@ -18,21 +18,56 @@ function Parse-BashArgs {
     while ($i -lt $ArgsArray.Count) {
         $arg = $ArgsArray[$i]
 
-        # 长参数: --option
         if ($arg.StartsWith('--')) {
-            $longName = $arg.Substring(2)
+            $longPart = $arg.Substring(2)
+            $longName = $longPart
+            $value = $null
+            $hasValue = $false
+
+            if ($longPart.Contains('=')) {
+                $eqIndex = $longPart.IndexOf('=')
+                $longName = $longPart.Substring(0, $eqIndex)
+                $value = $longPart.Substring($eqIndex + 1)
+                $hasValue = $true
+            }
+
             foreach ($key in $OptionSpec.Keys) {
                 if ($OptionSpec[$key].Long -eq $longName) {
-                    $result.Options[$key] = $true
-                    $result.LongOptions[$longName] = $true
+                    $spec = $OptionSpec[$key]
+                    if ($spec.Type -eq 'value') {
+                        if ($hasValue) {
+                            $result.Options[$key] = $value
+                            $result.LongOptions[$longName] = $value
+                        } elseif ($i + 1 -lt $ArgsArray.Count) {
+                            $i++
+                            $result.Options[$key] = $ArgsArray[$i]
+                            $result.LongOptions[$longName] = $ArgsArray[$i]
+                        }
+                    } else {
+                        $result.Options[$key] = $true
+                        $result.LongOptions[$longName] = $true
+                    }
                     break
                 }
             }
             $i++
         }
-        # 短参数: -a 或 -la 组合
         elseif ($arg.StartsWith('-') -and $arg.Length -gt 1) {
             $flags = $arg.Substring(1)
+
+            if ($flags.Length -eq 1 -and $OptionSpec.ContainsKey($flags) -and $OptionSpec[$flags].Type -eq 'value') {
+                if ($i + 1 -lt $ArgsArray.Count) {
+                    $i++
+                    $value = $ArgsArray[$i]
+                    $result.Options[$flags] = $value
+                    if ($OptionSpec[$flags].Long) {
+                        $result.LongOptions[$OptionSpec[$flags].Long] = $value
+                    }
+                }
+                $i++
+                continue
+            }
+
             for ($j = 0; $j -lt $flags.Length; $j++) {
                 $flag = [string]$flags[$j]
                 if ($OptionSpec.ContainsKey($flag)) {
@@ -44,7 +79,6 @@ function Parse-BashArgs {
             }
             $i++
         }
-        # 位置参数
         else {
             $result.Positional += $arg
             $i++

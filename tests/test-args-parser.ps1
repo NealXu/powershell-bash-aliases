@@ -34,3 +34,31 @@ Describe "Parse-BashArgs" {
         $result.LongOptions['all'] | Should Be $true
     }
 }
+
+Describe "Parse-BashArgs value parameters" {
+    It "Parses -n 5 value parameter" {
+        $spec = @{ 'n' = @{ Long = 'lines'; Type = 'value' } }
+        $result = Parse-BashArgs -ArgsArray @('-n', '5') -OptionSpec $spec
+        $result.Options['n'] | Should Be '5'
+        $result.LongOptions['lines'] | Should Be '5'
+    }
+
+    It "Parses --lines=10 value parameter" {
+        $spec = @{ 'n' = @{ Long = 'lines'; Type = 'value' } }
+        $result = Parse-BashArgs -ArgsArray @('--lines=20') -OptionSpec $spec
+        $result.Options['n'] | Should Be '20'
+        $result.LongOptions['lines'] | Should Be '20'
+    }
+
+    It "Parses mixed switches and values" {
+        $spec = @{
+            'a' = @{ Long = 'all'; Type = 'switch' }
+            'n' = @{ Long = 'lines'; Type = 'value' }
+        }
+        $result = Parse-BashArgs -ArgsArray @('-a', '-n', '5', 'file.txt') -OptionSpec $spec
+        $result.Options['a'] | Should Be $true
+        $result.Options['n'] | Should Be '5'
+        $result.Positional.Count | Should Be 1
+        $result.Positional[0] | Should Be 'file.txt'
+    }
+}
