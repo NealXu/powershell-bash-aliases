@@ -2,6 +2,7 @@
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "..\utils.ps1")
+. (Join-Path $scriptDir "..\args-parser.ps1")
 . (Join-Path $scriptDir "..\core-search.ps1")
 
 Describe "grep" {
@@ -15,17 +16,18 @@ Describe "grep" {
     }
 
     It "Matches pattern" {
-        $result = grep -Pattern "hello" -Path $testFile
+        $result = grep 'hello' $testFile
         $result -match "hello world" | Should Be $true
     }
 
     It "Case-insensitive with -i" {
-        $result = grep -Pattern "hello" -Path $testFile -i
+        # Use -- to prevent PowerShell from binding -i to common parameters
+        $result = grep -- -i 'hello' $testFile
         $result.Count | Should Be 2
     }
 
     It "Shows line numbers with -n" {
-        $result = grep -Pattern "hello" -Path $testFile -n
+        $result = grep -n 'hello' $testFile
         $result -match "1:" | Should Be $true
     }
 
@@ -36,8 +38,18 @@ Describe "grep" {
     }
 
     It "Shows help" {
-        $result = grep -Help
+        $result = grep --help
         $result -match "Usage" | Should Be $true
+    }
+
+    It "Counts matches with -c" {
+        $result = grep -c 'hello' $testFile
+        $result -match ": 2" | Should Be $true
+    }
+
+    It "Shows only filenames with -l" {
+        $result = grep -l 'hello' $testFile
+        $result -match "test-grep.txt" | Should Be $true
     }
 }
 
@@ -98,18 +110,40 @@ Describe "grep parameter tests" {
         Remove-Item $testFile1, $testFile2 -Force -ErrorAction SilentlyContinue
     }
     It "Searches multiple files" {
-        $result = grep -Pattern "hello" -Path $testFile1, $testFile2
+        $result = grep 'hello' $testFile1 $testFile2
         $result.Count | Should Be 2
     }
     It "Handles non-existent file" {
         # grep 会输出错误但继续执行
         $errorOccurred = $false
-        try { grep -Pattern "test" -Path "nonexistent.txt" } catch { $errorOccurred = $true }
+        try { grep 'test' 'nonexistent.txt' } catch { $errorOccurred = $true }
         $errorOccurred | Should Be $false
     }
     It "Returns empty for no match" {
-        $result = grep -Pattern "xyz123" -Path $testFile1
+        $result = grep 'xyz123' $testFile1
         $result | Should Be $null
+    }
+}
+
+Describe "grep long options" {
+    BeforeAll {
+        $testFile = "test-grep-long.txt"
+        Set-Content -Path $testFile -Value "Hello World", "test line" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Uses --ignore-case" {
+        $result = grep --ignore-case 'hello' $testFile
+        $result -match "Hello World" | Should Be $true
+    }
+    It "Uses --line-number" {
+        $result = grep --line-number 'test' $testFile
+        $result -match "2:" | Should Be $true
+    }
+    It "Uses --count" {
+        $result = grep --count 'test' $testFile
+        $result -match ": 1" | Should Be $true
     }
 }
 
