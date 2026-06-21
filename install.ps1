@@ -17,7 +17,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $sourceDir = $PSScriptRoot
-$files = @('bash-aliases.psm1', 'utils.ps1', 'core-file.ps1', 'core-text.ps1', 'core-search.ps1', 'core-process.ps1', 'core-network.ps1', 'core-view.ps1', 'core-system.ps1')
+$files = @('bash-aliases.psm1', 'args-parser.ps1', 'utils.ps1', 'core-file.ps1', 'core-text.ps1', 'core-search.ps1', 'core-process.ps1', 'core-network.ps1', 'core-view.ps1', 'core-system.ps1')
 
 foreach ($InstallPath in $InstallPaths) {
     if (Test-Path $InstallPath) {
