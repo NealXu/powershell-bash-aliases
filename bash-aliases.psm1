@@ -1,6 +1,7 @@
 # bash-aliases.psm1
 # PowerShell Bash Aliases Module
 
+. $PSScriptRoot\args-parser.ps1
 . $PSScriptRoot\utils.ps1
 . $PSScriptRoot\core-file.ps1
 . $PSScriptRoot\core-text.ps1
