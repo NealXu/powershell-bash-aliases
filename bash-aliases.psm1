@@ -23,6 +23,7 @@ Export-ModuleMember -Function ls, ll, cat, rm, mkdir, cp, mv, touch, head, tail,
 # PSReadLine key bindings (align with WSL bash readline)
 Import-Module PSReadLine -ErrorAction SilentlyContinue
 if (Get-Module PSReadLine -ErrorAction SilentlyContinue) {
+    Set-PSReadLineKeyHandler -Chord 'Ctrl+a' -Function BeginningOfLine
     Set-PSReadLineKeyHandler -Chord 'Ctrl+e' -Function EndOfLine
     Set-PSReadLineKeyHandler -Chord 'Ctrl+u' -Function BackwardKillLine
     Set-PSReadLineKeyHandler -Chord 'Ctrl+k' -Function KillLine
