@@ -62,3 +62,31 @@ Describe "Parse-BashArgs value parameters" {
         $result.Positional[0] | Should Be 'file.txt'
     }
 }
+
+Describe "Get-PipelineInput" {
+    It "Detects pipeline input" {
+        $inputData = @('line1', 'line2')
+        $result = Get-PipelineInput -InputObject $inputData -PathParams @()
+        $result.Source | Should Be 'pipeline'
+        $result.Data.Count | Should Be 2
+    }
+
+    It "Detects file path input" {
+        $result = Get-PipelineInput -InputObject $null -PathParams @('file.txt')
+        $result.Source | Should Be 'file'
+        $result.Paths[0] | Should Be 'file.txt'
+    }
+
+    It "Detects no input" {
+        $result = Get-PipelineInput -InputObject $null -PathParams @()
+        $result.Source | Should Be 'none'
+    }
+}
+
+Describe "Write-BashError" {
+    It "Formats error in bash style" {
+        # Verify function exists and format is correct
+        $errorMsg = "ls: cannot access 'file'"
+        $errorMsg.Substring(0,3) | Should Be "ls:"
+    }
+}

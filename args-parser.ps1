@@ -87,3 +87,26 @@ function Parse-BashArgs {
 
     return $result
 }
+
+function Get-PipelineInput {
+    param(
+        [object]$InputObject,
+        [string[]]$PathParams
+    )
+
+    if ($InputObject -and ($InputObject | Measure-Object).Count -gt 0) {
+        return @{ Source = 'pipeline'; Data = @($InputObject) }
+    }
+    elseif ($PathParams.Count -gt 0) {
+        return @{ Source = 'file'; Paths = $PathParams }
+    }
+    return @{ Source = 'none' }
+}
+
+function Write-BashError {
+    param(
+        [string]$Command,
+        [string]$Message
+    )
+    Write-Error "${Command}: $Message" -ErrorAction Continue
+}
