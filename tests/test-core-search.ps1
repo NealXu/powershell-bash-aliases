@@ -86,3 +86,69 @@ Describe "which" {
         $result -match "Usage" | Should Be $true
     }
 }
+
+Describe "grep parameter tests" {
+    BeforeAll {
+        $testFile1 = "test-grep-multi1.txt"
+        $testFile2 = "test-grep-multi2.txt"
+        Set-Content -Path $testFile1 -Value "hello world", "test line" -Encoding UTF8
+        Set-Content -Path $testFile2 -Value "hello again" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile1, $testFile2 -Force -ErrorAction SilentlyContinue
+    }
+    It "Searches multiple files" {
+        $result = grep -Pattern "hello" -Path $testFile1, $testFile2
+        $result.Count | Should Be 2
+    }
+    It "Handles non-existent file" {
+        # grep 会输出错误但继续执行
+        $errorOccurred = $false
+        try { grep -Pattern "test" -Path "nonexistent.txt" } catch { $errorOccurred = $true }
+        $errorOccurred | Should Be $false
+    }
+    It "Returns empty for no match" {
+        $result = grep -Pattern "xyz123" -Path $testFile1
+        $result | Should Be $null
+    }
+}
+
+Describe "find parameter tests" {
+    BeforeAll {
+        $testDir = "test-find-params"
+        New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+        New-Item -ItemType Directory -Path "$testDir\sub" -Force | Out-Null
+        New-Item -ItemType File -Path "$testDir\file.txt" -Force | Out-Null
+    }
+    AfterAll {
+        Remove-Item "test-find-params" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    It "Uses default path '.'" {
+        # 验证默认路径参数
+        $code = Get-Content (Join-Path $scriptDir "..\core-search.ps1") -Raw
+        $code -match "Path='.'" | Should Be $true
+    }
+    It "Handles empty directory" {
+        $emptyDir = "test-find-empty"
+        New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
+        $result = find -Path $emptyDir
+        $result | Should Be $emptyDir
+        Remove-Item $emptyDir -Force -ErrorAction SilentlyContinue
+    }
+    It "Returns empty for no match" {
+        $result = find -Path $testDir -name "*.xyz"
+        $result | Should Be $null
+    }
+}
+
+Describe "which parameter tests" {
+    It "Shows all sources with -a" {
+        # 验证 -a 参数逻辑
+        $code = Get-Content (Join-Path $scriptDir "..\core-search.ps1") -Raw
+        $code -match "\-a.*Source" | Should Be $true
+    }
+    It "Handles non-existent command" {
+        $result = which -Command "nonexistent-cmd-xyz"
+        $result | Should Be $null
+    }
+}

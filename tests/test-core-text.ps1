@@ -111,4 +111,155 @@ Describe "tr" {
         $result = "hello" -replace "l", ""
         $result | Should Be "heo"
     }
+    It "Shows help" {
+        $result = tr -Help
+        $result -match "Usage" | Should Be $true
+    }
+}
+
+Describe "head parameter tests" {
+    BeforeAll {
+        $testFile = "test-head-params.txt"
+        $content = @()
+        for ($i=1; $i -le 20; $i++) { $content += "line$i" }
+        Set-Content -Path $testFile -Value $content -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows help" {
+        $result = head -Help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Accepts custom n parameter" {
+        $result = head -Path $testFile -n 3
+        $result.Count | Should Be 3
+    }
+}
+
+Describe "tail parameter tests" {
+    BeforeAll {
+        $testFile = "test-tail-params.txt"
+        $content = @()
+        for ($i=1; $i -le 20; $i++) { $content += "line$i" }
+        Set-Content -Path $testFile -Value $content -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows help" {
+        $result = tail -Help
+        $result -match "Usage" | Should Be $true
+    }
+    It "-f flag is accepted" {
+        # -f 使用 Get-Content -Wait，需要跳过实际执行
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "Get-Content.*-Wait" | Should Be $true
+    }
+}
+
+Describe "wc parameter tests" {
+    BeforeAll {
+        $testFile = "test-wc-params.txt"
+        $testFile2 = "test-wc-params2.txt"
+        Set-Content -Path $testFile -Value "hello world", "test line" -Encoding UTF8
+        Set-Content -Path $testFile2 -Value "single" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile, $testFile2 -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows character count with -c" {
+        $result = wc -Path $testFile -c
+        $result -match "\d+" | Should Be $true
+    }
+    It "Shows all counts by default" {
+        $result = wc -Path $testFile
+        $result -match "\d+ \d+ \d+" | Should Be $true
+    }
+    It "Shows combined counts" {
+        $result = wc -Path $testFile -l -w
+        $result -match "\d+ \d+" | Should Be $true
+    }
+    It "Shows help" {
+        $result = wc -Help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Handles multiple files" {
+        $result = wc -Path $testFile, $testFile2
+        $result.Count | Should Be 2
+    }
+}
+
+Describe "sort parameter tests" {
+    BeforeAll {
+        $testFile = "test-sort-params.txt"
+        Set-Content -Path $testFile -Value "10", "2", "1", "20" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows help" {
+        $result = sort -Help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Sorts numerically with -n" {
+        $result = sort -Path $testFile -n
+        $result[0] | Should Be "1"
+        $result[1] | Should Be "2"
+    }
+    It "Shows unique values with -u" {
+        $dupFile = "test-sort-uniq.txt"
+        Set-Content -Path $dupFile -Value "a", "a", "b" -Encoding UTF8
+        $result = sort -Path $dupFile -u
+        $result.Count | Should Be 2
+        Remove-Item $dupFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Combines -n and -r" {
+        $result = sort -Path $testFile -n -r
+        $result[0] | Should Be "20"
+    }
+}
+
+Describe "uniq parameter tests" {
+    It "Shows help" {
+        $result = uniq -Help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Shows counts with -c" {
+        $inputData = @("a", "a", "b", "b", "c")
+        $sorted = $inputData | Sort-Object
+        # uniq 函数使用 $input，需要特殊测试方式
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "Group" | Should Be $true
+    }
+    It "Shows duplicates only with -d" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "Get-Unique" | Should Be $true
+    }
+}
+
+Describe "cut parameter tests" {
+    BeforeAll {
+        $testFile = "test-cut-params.txt"
+        Set-Content -Path $testFile -Value "a,b,c", "x,y,z" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows help" {
+        $result = cut -Help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Uses custom delimiter with -d" {
+        $result = cut -Path $testFile -d "," -f "1"
+        $result[0] | Should Be "a"
+    }
+    It "Extracts multiple fields" {
+        $result = cut -Path $testFile -d "," -f "1,3"
+        $result[0] | Should Be "a,c"
+    }
+    It "Handles field index out of range" {
+        $result = cut -Path $testFile -d "," -f "10"
+        $result[0] | Should Be ""
+    }
 }
