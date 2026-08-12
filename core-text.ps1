@@ -288,3 +288,422 @@ function tr {
         Write-Output $content
     }
 }
+
+function sed {
+    param(
+        [switch]$i, [switch]$n, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($i) { $allArgs += '-i' }
+    if ($n) { $allArgs += '-n' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'i' = @{ Long = 'in-place'; Type = 'switch' }
+        'n' = @{ Long = 'quiet'; Type = 'switch' }
+        'e' = @{ Long = 'expression'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: sed [-i] [-n] [-e SCRIPT] [--help] FILE'
+    }
+
+    $inPlace = $parsed.Options['i'] -or $parsed.LongOptions['in-place']
+    $quiet = $parsed.Options['n'] -or $parsed.LongOptions['quiet']
+    $script = $parsed.Options['e']
+
+    if (-not $script -and $parsed.Positional.Count -gt 0) {
+        # First positional argument is the script
+        $script = $parsed.Positional[0]
+        $parsed.Positional = $parsed.Positional[1..($parsed.Positional.Count - 1)]
+    }
+
+    if (-not $script) {
+        Write-BashError -Command 'sed' -Message 'missing script'
+        return
+    }
+
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'sed' -Message 'missing file'
+        return
+    }
+
+    $filePath = Convert-BashPath $parsed.Positional[0]
+    if (-not (Test-Path $filePath)) {
+        Write-BashError -Command 'sed' -Message "cannot access '$filePath'"
+        return
+    }
+
+    $content = Get-Content $filePath
+    $result = @()
+
+    # Parse sed command (basic support for s/pattern/replacement/[flags])
+    if ($script -match '^s(.)(.+?)\1(.*?)\1([gi]*)$') {
+        $delimiter = $matches[1]
+        $pattern = $matches[2]
+        $replacement = $matches[3]
+        $flags = $matches[4]
+
+        foreach ($line in $content) {
+            $newLine = $line
+
+            # Check for global flag
+            if ($flags -match 'g') {
+                $newLine = $line -replace $pattern, $replacement
+            } else {
+                # Replace only first occurrence
+                if ($line -match $pattern) {
+                    $newLine = $line -replace $pattern, $replacement
+                }
+            }
+
+            # If not quiet mode, output the line
+            if (-not $quiet) {
+                $result += $newLine
+            }
+
+            # Track if line was modified
+            if ($inPlace) {
+                $result[-1] = $newLine
+            }
+        }
+
+        if ($inPlace) {
+            $result | Set-Content $filePath -Encoding UTF8
+        } else {
+            $result
+        }
+    } else {
+        # Unsupported sed command
+        Write-BashError -Command 'sed' -Message "unsupported script: $script"
+        return
+    }
+}
+
+function awk {
+    param(
+        [switch]$F, [switch]$v, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($F) { $allArgs += '-F' }
+    if ($v) { $allArgs += '-v' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'F' = @{ Long = 'field-separator'; Type = 'value'; DefaultValue = ' ' }
+        'v' = @{ Long = 'assign'; Type = 'value' }
+        'file' = @{ Long = 'script-file'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: awk [-F SEP] [-v VAR=VAL] "PROGRAM" [FILE] [--help]'
+    }
+
+    $separator = $parsed.Options['F']
+    if (-not $separator) { $separator = ' ' }
+
+    # Get the program/script
+    $program = $null
+    $files = @()
+
+    # First positional arg is the program if it looks like a script
+    if ($parsed.Positional.Count -gt 0) {
+        $firstArg = $parsed.Positional[0]
+        # If it contains { or looks like a pattern-action, it's the program
+        if ($firstArg -match '[\{\}]' -or $firstArg -match '^\$' -or $firstArg -match 'BEGIN|END|print') {
+            $program = $firstArg
+            $files = $parsed.Positional[1..($parsed.Positional.Count - 1)]
+        } else {
+            # It's a file, program was passed via -f
+            $files = $parsed.Positional
+        }
+    }
+
+    if (-not $program -and -not $parsed.Options['file']) {
+        Write-BashError -Command 'awk' -Message 'missing program'
+        return
+    }
+
+    # If no files, read from pipeline/input
+    $content = @()
+    if ($files.Count -gt 0) {
+        foreach ($f in $files) {
+            $filePath = Convert-BashPath $f
+            if (Test-Path $filePath) {
+                $content += Get-Content $filePath
+            } else {
+                Write-BashError -Command 'awk' -Message "cannot access '$filePath'"
+            }
+        }
+    } else {
+        $content = @($input)
+    }
+
+    # Simplified awk implementation
+    # Support basic patterns: /pattern/, BEGIN, END, NR, NF, $N, print
+    $result = @()
+    $lineNum = 0
+
+    # Parse variable assignments from -v
+    $variables = @{}
+    if ($parsed.Options['v']) {
+        $parsed.Options['v'] -split ',' | ForEach-Object {
+            if ($_ -match '^(\w+)=(.+)$') {
+                $variables[$matches[1]] = $matches[2]
+            }
+        }
+    }
+
+    foreach ($line in $content) {
+        $lineNum++
+        $fields = $line.Split($separator)
+        $NF = $fields.Count
+        $NR = $lineNum
+
+        # Evaluate the program for each line
+        $output = $line
+
+        # Simple pattern matching and print support
+        if ($program -match '/(.+)/\s*\{\s*print\s*(.*?)\s*\}') {
+            $pattern = $matches[1]
+            $printExpr = $matches[2]
+            if ($line -match $pattern) {
+                if ($printExpr -match '\$(\d+)') {
+                    $fieldIdx = [int]$matches[1] - 1
+                    if ($fieldIdx -ge 0 -and $fieldIdx -lt $fields.Count) {
+                        $output = $fields[$fieldIdx]
+                    }
+                } elseif ($printExpr -eq '$0' -or $printExpr -eq '') {
+                    $output = $line
+                } else {
+                    $output = $printExpr
+                }
+                $result += $output
+            }
+        } elseif ($program -match 'print\s+\$(\d+)') {
+            # Simple print field
+            $fieldIdx = [int]$matches[1] - 1
+            if ($fieldIdx -ge 0 -and $fieldIdx -lt $fields.Count) {
+                $result += $fields[$fieldIdx]
+            }
+        } elseif ($program -match 'print') {
+            # Default print $0
+            $result += $line
+        } elseif ($program -match '\{(.+)\}') {
+            # Generic block
+            $block = $matches[1]
+            if ($block -match 'print\s+(.+)') {
+                $printContent = $matches[1]
+                # Substitute $N with field values
+                for ($i = $fields.Count; $i -ge 1; $i--) {
+                    $printContent = $printContent -replace "\$$i", $fields[$i - 1]
+                }
+                $printContent = $printContent -replace '\$0', $line
+                $printContent = $printContent -replace '\$NF', $NF
+                $printContent = $printContent -replace '\$NR', $NR
+                $result += $printContent
+            }
+        } else {
+            # Just print the line
+            $result += $line
+        }
+    }
+
+    $result
+}
+
+function patch {
+    param(
+        [switch]$p, [switch]$R, [switch]$dry_run, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($p) { $allArgs += '-p' }
+    if ($R) { $allArgs += '-R' }
+    if ($dry_run) { $allArgs += '--dry-run' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'p' = @{ Long = 'strip'; Type = 'value'; DefaultValue = '0' }
+        'R' = @{ Long = 'reverse'; Type = 'switch' }
+        'dry-run' = @{ Long = 'dry-run'; Type = 'switch' }
+        'o' = @{ Long = 'output'; Type = 'value' }
+        'i' = @{ Long = 'input'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: patch [-p NUM] [-R] [--dry-run] [-i PATCH] [FILE] [--help]'
+    }
+
+    $stripLevel = [int]$parsed.Options['p']
+    $reverse = $parsed.Options['R'] -or $parsed.LongOptions['reverse']
+    $dryRun = $parsed.Options['dry-run'] -or $parsed.LongOptions['dry-run']
+    $patchFile = $parsed.Options['i']
+    $outputFile = $parsed.Options['o']
+
+    # Determine target file and patch file
+    $targetFile = $null
+
+    if ($patchFile) {
+        $patchPath = Convert-BashPath $patchFile
+        if (-not (Test-Path $patchPath)) {
+            Write-BashError -Command 'patch' -Message "cannot access patch file '$patchPath'"
+            return
+        }
+        $patchContent = Get-Content $patchPath
+    } elseif ($parsed.Positional.Count -gt 0) {
+        # First positional is patch file
+        $patchPath = Convert-BashPath $parsed.Positional[0]
+        if (Test-Path $patchPath) {
+            $patchContent = Get-Content $patchPath
+        } else {
+            Write-BashError -Command 'patch' -Message "cannot access '$patchPath'"
+            return
+        }
+    } else {
+        Write-BashError -Command 'patch' -Message 'missing patch file'
+        return
+    }
+
+    # Parse unified diff format
+    # Format:
+    # --- a/file
+    # +++ b/file
+    # @@ -l,s +l,s @@ context
+    # lines starting with - are removed
+    # lines starting with + are added
+    # lines starting with space are context
+
+    $currentFile = $null
+    $hunks = @()
+    $currentHunk = $null
+
+    foreach ($line in $patchContent) {
+        if ($line -match '^---\s+(.+)') {
+            # Old file
+            $oldFile = $matches[1]
+            # Strip a/ prefix if present
+            if ($stripLevel -gt 0 -and $oldFile -match '^[ab]/') {
+                $oldFile = $oldFile.Substring(2)
+            }
+        } elseif ($line -match '^\+\+\+\s+(.+)') {
+            # New file (target)
+            $newFile = $matches[1]
+            if ($stripLevel -gt 0 -and $newFile -match '^[ab]/') {
+                $newFile = $newFile.Substring(2)
+            }
+            if (-not $targetFile) {
+                $targetFile = $newFile
+            }
+        } elseif ($line -match '^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@') {
+            # Hunk header
+            if ($currentHunk) {
+                $hunks += $currentHunk
+            }
+            $currentHunk = @{
+                OldStart = [int]$matches[1]
+                OldCount = if ($matches[2]) { [int]$matches[2] } else { 1 }
+                NewStart = [int]$matches[3]
+                NewCount = if ($matches[4]) { [int]$matches[4] } else { 1 }
+                Lines = @()
+            }
+        } elseif ($currentHunk) {
+            # Hunk content
+            $currentHunk.Lines += $line
+        }
+    }
+
+    if ($currentHunk) {
+        $hunks += $currentHunk
+    }
+
+    if ($hunks.Count -eq 0) {
+        Write-BashError -Command 'patch' -Message 'no hunks found in patch'
+        return
+    }
+
+    if (-not $targetFile) {
+        Write-BashError -Command 'patch' -Message 'could not determine target file from patch'
+        return
+    }
+
+    $targetPath = Convert-BashPath $targetFile
+    if (-not (Test-Path $targetPath)) {
+        Write-BashError -Command 'patch' -Message "cannot access '$targetPath'"
+        return
+    }
+
+    $fileContent = Get-Content $targetPath
+
+    if ($dryRun) {
+        Write-Output "Dry run: would patch $targetFile"
+        Write-Output "Found $($hunks.Count) hunk(s)"
+        return
+    }
+
+    # Apply hunks (simplified - just handle basic cases)
+    $result = @()
+    $lineIdx = 0
+    $hunkIdx = 0
+
+    foreach ($hunk in $hunks) {
+        # Add lines before this hunk
+        $startLine = $hunk.NewStart - 1
+        while ($lineIdx -lt $startLine -and $lineIdx -lt $fileContent.Count) {
+            $result += $fileContent[$lineIdx]
+            $lineIdx++
+        }
+
+        # Process hunk lines
+        foreach ($hunkLine in $hunk.Lines) {
+            if ($hunkLine -match '^\+(.*)') {
+                # Added line
+                if (-not $reverse) {
+                    $result += $matches[1]
+                }
+            } elseif ($hunkLine -match '^-(.*)') {
+                # Removed line
+                if ($reverse) {
+                    $result += $matches[1]
+                } else {
+                    $lineIdx++  # Skip this line in original
+                }
+            } elseif ($hunkLine -match '^\s(.*)') {
+                # Context line
+                $result += $matches[1]
+                $lineIdx++
+            }
+        }
+    }
+
+    # Add remaining lines
+    while ($lineIdx -lt $fileContent.Count) {
+        $result += $fileContent[$lineIdx]
+        $lineIdx++
+    }
+
+    if ($outputFile) {
+        $result | Set-Content (Convert-BashPath $outputFile) -Encoding UTF8
+        Write-Output "Patched content written to $outputFile"
+    } else {
+        $result | Set-Content $targetPath -Encoding UTF8
+        Write-Output "Patched $targetFile"
+    }
+}

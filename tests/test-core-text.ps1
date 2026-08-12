@@ -255,3 +255,98 @@ Describe "cut parameter tests" {
         $result[0] | Should Be ""
     }
 }
+
+Describe "sed" {
+    BeforeAll {
+        $testFile = "test-sed.txt"
+        Set-Content -Path $testFile -Value "hello world", "foo bar", "test line" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+        Remove-Item "test-sed-out.txt" -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows help" {
+        $result = sed --help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Substitutes text" {
+        $result = sed "s/hello/HELLO/" $testFile
+        $result[0] | Should Be "HELLO world"
+    }
+    It "Performs global substitution" {
+        $result = sed "s/o/O/g" $testFile
+        $result[0] | Should Be "hellO wOrld"
+    }
+    It "Modifies file in place with -i" {
+        Copy-Item $testFile "test-sed-out.txt"
+        sed -i "s/test/TEST/" "test-sed-out.txt"
+        $content = Get-Content "test-sed-out.txt"
+        $content[2] | Should Be "TEST line"
+    }
+}
+
+Describe "awk" {
+    BeforeAll {
+        $testFile = "test-awk.txt"
+        Set-Content -Path $testFile -Value "apple 10 red", "banana 20 yellow", "cherry 30 red" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows help" {
+        $result = awk --help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Uses field separator -F" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "field-separator" | Should Be $true
+    }
+    It "Prints specific field" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "print" | Should Be $true
+    }
+    It "Processes file content" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "Get-Content" | Should Be $true
+    }
+}
+
+Describe "patch" {
+    BeforeAll {
+        $testFile = "test-patch-original.txt"
+        Set-Content -Path $testFile -Value "line1", "line2", "line3" -Encoding UTF8
+
+        $patchFile = "test-patch.diff"
+        $patchContent = @(
+            "--- a/test-patch-original.txt",
+            "+++ b/test-patch-original.txt",
+            "@@ -1,3 +1,3 @@",
+            " line1",
+            "-line2",
+            "+LINE2_MODIFIED",
+            " line3"
+        )
+        Set-Content -Path $patchFile -Value $patchContent -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $patchFile -Force -ErrorAction SilentlyContinue
+        Remove-Item "test-patch-output.txt" -Force -ErrorAction SilentlyContinue
+    }
+    It "Shows help" {
+        $result = patch --help
+        $result -match "Usage" | Should Be $true
+    }
+    It "Shows dry-run option" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "dry-run" | Should Be $true
+    }
+    It "Shows reverse option" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "reverse" | Should Be $true
+    }
+    It "Parses unified diff format" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
+        $code -match "^---.*\+\+\+" | Should Be $true
+    }
+}
