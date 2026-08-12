@@ -313,3 +313,168 @@ function xargs {
     # Placeholder - will be implemented in later task
     Write-Output "xargs: placeholder"
 }
+
+function date {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'd' = @{ Long = 'date'; Type = 'value' }
+        'u' = @{ Long = 'utc'; Type = 'switch' }
+        'R' = @{ Long = 'rfc-2822'; Type = 'switch' }
+        'I' = @{ Long = 'iso-8601'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: date [-d DATE] [-u] [-R] [-I] [--help] [+FORMAT]'
+    }
+
+    $dateStr = $parsed.Options['d']
+    $utc = $parsed.Options['u'] -or $parsed.LongOptions['utc']
+    $rfc2822 = $parsed.Options['R'] -or $parsed.LongOptions['rfc-2822']
+    $iso8601 = $parsed.Options['I'] -or $parsed.LongOptions['iso-8601']
+
+    # Get date object
+    $dateObj = if ($dateStr) {
+        try {
+            [DateTime]::Parse($dateStr)
+        } catch {
+            Write-BashError -Command 'date' -Message "invalid date '$dateStr'"
+            return
+        }
+    } else {
+        Get-Date
+    }
+
+    # Adjust for UTC
+    if ($utc) {
+        $dateObj = $dateObj.ToUniversalTime()
+    }
+
+    # Check for format string
+    $format = $parsed.Positional | Where-Object { $_ -match '^\+' } | Select-Object -First 1
+    if ($format) {
+        $formatStr = $format.Substring(1)
+        # Convert bash date format to PowerShell format
+        $output = $dateObj.ToString($formatStr)
+        Write-Output $output
+    } elseif ($rfc2822) {
+        # RFC 2822 format: Wed, 02 Oct 2002 13:00:00 -0700
+        Write-Output $dateObj.ToString('ddd, dd MMM yyyy HH:mm:ss zzz')
+    } elseif ($iso8601) {
+        # ISO 8601 format: 2002-10-02T15:00:00Z
+        Write-Output $dateObj.ToString('yyyy-MM-ddTHH:mm:ssZ')
+    } else {
+        # Default format
+        Write-Output $dateObj.ToString('ddd MMM dd HH:mm:ss yyyy')
+    }
+}
+
+function env {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'i' = @{ Long = 'ignore-environment'; Type = 'switch' }
+        'u' = @{ Long = 'unset'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: env [-i] [-u NAME] [--help] [NAME=VALUE...] [COMMAND]'
+    }
+
+    $ignoreEnv = $parsed.Options['i'] -or $parsed.LongOptions['ignore-environment']
+    $unsetVar = $parsed.Options['u']
+
+    # If no arguments, just print environment variables
+    if ($parsed.Positional.Count -eq 0 -and -not $ignoreEnv -and -not $unsetVar) {
+        # Print all environment variables
+        $vars = Get-ChildItem Env: | Sort-Object Name
+        foreach ($var in $vars) {
+            Write-Output "$($var.Key)=$($var.Value)"
+        }
+        return
+    }
+
+    # Handle environment modifications
+    $newEnv = @{}
+    if (-not $ignoreEnv) {
+        # Copy current environment
+        Get-ChildItem Env: | ForEach-Object {
+            $newEnv[$_.Key] = $_.Value
+        }
+    }
+
+    # Unset specified variable
+    if ($unsetVar) {
+        $newEnv.Remove($unsetVar)
+    }
+
+    # Process NAME=VALUE assignments
+    $commandIndex = -1
+    for ($i = 0; $i -lt $parsed.Positional.Count; $i++) {
+        $arg = $parsed.Positional[$i]
+        if ($arg -match '^([^=]+)=(.*)$') {
+            $name = $matches[1]
+            $value = $matches[2]
+            $newEnv[$name] = $value
+        } else {
+            $commandIndex = $i
+            break
+        }
+    }
+
+    # If there's a command to run, run it with the new environment
+    if ($commandIndex -ge 0) {
+        $command = $parsed.Positional[$commandIndex]
+        $commandArgs = $parsed.Positional[($commandIndex + 1)..($parsed.Positional.Count - 1)]
+
+        # Set environment temporarily
+        $originalEnv = @{}
+        foreach ($key in $newEnv.Keys) {
+            $originalEnv[$key] = Get-Item "Env:$key" -ErrorAction SilentlyContinue
+            Set-Item "Env:$key" $newEnv[$key]
+        }
+
+        try {
+            # Use Invoke-Expression to run the command
+            $commandStr = $command
+            if ($commandArgs.Count -gt 0) {
+                $commandStr += " " + ($commandArgs -join " ")
+            }
+            Invoke-Expression $commandStr
+        } finally {
+            # Restore original environment
+            foreach ($key in $newEnv.Keys) {
+                if ($originalEnv[$key]) {
+                    Set-Item "Env:$key" $originalEnv[$key].Value
+                } else {
+                    Remove-Item "Env:$key" -ErrorAction SilentlyContinue
+                }
+            }
+        }
+    } else {
+        # Just print the modified environment
+        $newEnv.GetEnumerator() | Sort-Object Name | ForEach-Object {
+            Write-Output "$($_.Key)=$($_.Value)"
+        }
+    }
+}

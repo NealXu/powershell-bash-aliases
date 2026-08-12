@@ -2,9 +2,10 @@
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
 
-# Force remove echo and tee aliases to ensure function calls work
+# Force remove echo, tee, and env aliases to ensure function calls work
 Remove-Item "Global:Alias:echo" -Force -ErrorAction SilentlyContinue
 Remove-Item "Global:Alias:tee" -Force -ErrorAction SilentlyContinue
+Remove-Item "Global:Alias:env" -Force -ErrorAction SilentlyContinue
 
 Describe "echo" {
     It "Outputs text" {
@@ -68,5 +69,35 @@ Describe "tee" {
     It "Shows help" {
         $result = tee --help
         $result | Should Match "Usage"
+    }
+}
+
+Describe "date" {
+    It "Shows current date" {
+        $result = date
+        $result -match "\w{3}" | Should Be $true
+    }
+
+    It "Shows help" {
+        $result = date --help
+        $result | Should Match "Usage"
+    }
+
+    It "Accepts custom date" {
+        $result = date -d "2023-01-01"
+        # Verify it doesn't throw and returns something
+        $result | Should Not Be $null
+    }
+}
+
+Describe "env" {
+    It "Shows help" {
+        $result = env --help
+        $result | Should Match "Usage"
+    }
+
+    It "Does not throw when called" {
+        # Verify env doesn't throw when called
+        { env } | Should Not Throw
     }
 }
