@@ -178,5 +178,91 @@ function hostname {
     Write-Output $env:COMPUTERNAME
 }
 
+function free {
+    param(
+        [switch]$h, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($h) { $allArgs += '-h' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'h' = @{ Long = 'human'; Type = 'switch' }
+        'b' = @{ Long = 'bytes'; Type = 'switch' }
+        'k' = @{ Long = 'kilo'; Type = 'switch' }
+        'm' = @{ Long = 'mega'; Type = 'switch' }
+        'g' = @{ Long = 'giga'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: free [-h] [-b|-k|-m|-g] [--help]'
+    }
+
+    $humanReadable = $parsed.Options['h'] -or $parsed.LongOptions['human']
+
+    # Get memory information from Windows
+    $os = Get-CimInstance Win32_OperatingSystem
+    $cs = Get-CimInstance Win32_ComputerSystem
+
+    $totalMem = $cs.TotalPhysicalMemory
+    $freeMem = $os.FreePhysicalMemory * 1KB  # Convert from KB
+    $usedMem = $totalMem - $freeMem
+
+    # Calculate percentages
+    $usedPct = [Math]::Round(($usedMem / $totalMem) * 100)
+    $freePct = [Math]::Round(($freeMem / $totalMem) * 100)
+
+    # Swap memory (page file)
+    $pageFile = Get-CimInstance Win32_PageFileUsage -ErrorAction SilentlyContinue
+    $swapTotal = if ($pageFile) { ($pageFile | Measure-Object -Property AllocatedBaseSize -Sum).Sum * 1MB } else { 0 }
+    $swapUsed = if ($pageFile) { ($pageFile | Measure-Object -Property CurrentUsage -Sum).Sum * 1MB } else { 0 }
+    $swapFree = $swapTotal - $swapUsed
+
+    if ($humanReadable) {
+        $totalMem = Format-FileSize $totalMem -HumanReadable
+        $usedMem = Format-FileSize $usedMem -HumanReadable
+        $freeMem = Format-FileSize $freeMem -HumanReadable
+        $swapTotal = Format-FileSize $swapTotal -HumanReadable
+        $swapUsed = Format-FileSize $swapUsed -HumanReadable
+        $swapFree = Format-FileSize $swapFree -HumanReadable
+    }
+
+    # Output in free command format
+    Write-Output "              total        used        free      shared  buff/cache   available"
+    Write-Output "Mem:      $totalMem  $usedMem  $freeMem      0B           0B  $freeMem"
+    Write-Output "Swap:     $swapTotal  $swapUsed  $swapFree"
+}
+
+function whoami {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: whoami [--help]'
+    }
+
+    # Get current user
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    Write-Output $currentUser.Name
+}
+
 function yolo { codex --yolo @args }
 function yoloc { codex --yolo resume --last @args }

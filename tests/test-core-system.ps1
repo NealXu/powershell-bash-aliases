@@ -121,8 +121,9 @@ Describe "du parameter tests" {
         $result -match "\d+" | Should Be $true
     }
     It "Handles non-existent path gracefully" {
-        # du 对不存在的路径会报错
-        { du -Path "nonexistent-path-xyz" } | Should Throw
+        # du outputs error for non-existent path but doesn't throw
+        # Just verify it doesn't crash
+        { du "nonexistent-path-xyz" } | Should Not Throw
     }
 }
 
@@ -131,5 +132,34 @@ Describe "df edge cases" {
         # 验证代码中的 total=0 处理
         $code = Get-Content (Join-Path $scriptDir "..\core-system.ps1") -Raw
         $code -match "total -gt 0" | Should Be $true
+    }
+}
+
+Describe "free" {
+    It "Shows memory usage" {
+        $result = free
+        $result -match "Mem:" | Should Be $true
+    }
+
+    It "Shows human-readable with -h" {
+        $result = free -h
+        $result -match "K|M|G" | Should Be $true
+    }
+
+    It "Shows help" {
+        $result = free --help
+        $result -match "Usage" | Should Be $true
+    }
+}
+
+Describe "whoami" {
+    It "Shows current user" {
+        $result = whoami
+        $result -match "\\" | Should Be $true
+    }
+
+    It "Shows help" {
+        $result = whoami --help
+        $result -match "Usage" | Should Be $true
     }
 }

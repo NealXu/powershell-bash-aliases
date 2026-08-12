@@ -51,3 +51,41 @@ Describe "less" {
         $content.Count | Should Be 50
     }
 }
+
+Describe "more" {
+    BeforeAll {
+        $testFile = "test-more.txt"
+        $content = @()
+        for ($i=1; $i -le 50; $i++) { $content += "Line $i of test content" }
+        Set-Content -Path $testFile -Value $content -Encoding UTF8
+    }
+
+    AfterAll {
+        Remove-Item "test-more.txt" -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Shows help" {
+        $result = more --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Accepts -d silent flag" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-view.ps1") -Raw
+        $code -match "silent" | Should Be $true
+    }
+
+    It "Accepts -f logical flag" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-view.ps1") -Raw
+        $code -match "logical" | Should Be $true
+    }
+
+    It "Accepts -p pattern flag" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-view.ps1") -Raw
+        $code -match "pattern" | Should Be $true
+    }
+
+    It "Uses Out-Host -Paging for display" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-view.ps1") -Raw
+        $code -match "Out-Host.*-Paging" | Should Be $true
+    }
+}

@@ -85,14 +85,14 @@ foreach ($file in $coreFiles) {
     $covered = $coveredFunctions[$file]
     $totalCovered += $covered
     $coveragePercent = [Math]::Round(($covered / $functionCounts[$file]) * 100)
-    Write-Host "  $file: $coveragePercent% ($covered/$($functionCounts[$file]) functions)"
+    Write-Host "  ${file}: $coveragePercent% ($covered/$($functionCounts[$file]) functions)"
 }
 
 $overallCoverage = [Math]::Round(($totalCovered / $totalFunctions) * 100)
 Write-Host ""
-Write-Host "Overall Estimated Coverage: $overallCoverage% ($totalCovered/$totalFunctions functions)" -ForegroundColor $(if ($overallCoverage >= 85) { "Green" } else { "Yellow" })
+Write-Host "Overall Estimated Coverage: $overallCoverage% ($totalCovered/$totalFunctions functions)" -ForegroundColor $(if ($overallCoverage -ge 85) { "Green" } else { "Yellow" })
 
-if ($overallCoverage >= 85) {
+if ($overallCoverage -ge 85) {
     Write-Host "Coverage target of 85% achieved!" -ForegroundColor Green
 } else {
     Write-Host "Coverage target of 85% not yet achieved. Need $($totalFunctions - $totalCovered) more function tests." -ForegroundColor Yellow
