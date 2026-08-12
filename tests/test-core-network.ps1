@@ -102,8 +102,12 @@ Describe "netstat" {
 }
 
 Describe "wget" {
+    BeforeAll {
+        # Get the wget function from the module
+        $script:wgetFunc = Get-Command wget -CommandType Function -ErrorAction SilentlyContinue
+    }
     It "Shows help" {
-        $result = wget -Help
+        $result = & $script:wgetFunc --help
         $result -match "Usage" | Should Be $true
     }
 

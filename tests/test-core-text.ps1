@@ -360,6 +360,6 @@ Describe "patch" {
     }
     It "Parses unified diff format" {
         $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
-        $code -match "---.*\+\+\+" | Should Be $true
+        $code -match '\^---\\s\+' | Should Be $true
     }
 }
