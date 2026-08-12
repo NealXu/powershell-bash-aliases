@@ -30,7 +30,11 @@ cd powershell-bash-aliases
 .\install.ps1 -AddToProfile -Force
 ```
 
-安装位置：`$HOME\Documents\WindowsPowerShell\Modules\bash-aliases\`
+安装脚本会自动识别本机安装的 PowerShell 类型,只部署到实际存在的 shell 对应目录:
+- Windows PowerShell 5.1 → `$HOME\Documents\WindowsPowerShell\Modules\bash-aliases\`
+- PowerShell 7+ (pwsh) → `$HOME\Documents\PowerShell\Modules\bash-aliases\`
+
+也可用 `-InstallPaths` 手动指定安装位置。
 
 ### 验证
 
