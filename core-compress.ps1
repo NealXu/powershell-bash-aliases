@@ -27,7 +27,7 @@ function tar {
         'z' = @{ Long = 'gzip'; Type = 'switch' }
         'j' = @{ Long = 'bzip2'; Type = 'switch' }
         'f' = @{ Long = 'file'; Type = 'value' }
-        'directory' = @{ Long = 'directory'; Type = 'value' }
+        'C' = @{ Long = 'directory'; Type = 'value' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
@@ -44,7 +44,7 @@ function tar {
     $gzip = $parsed.Options['z'] -or $parsed.LongOptions['gzip']
     $bzip2 = $parsed.Options['j'] -or $parsed.LongOptions['bzip2']
     $archiveFile = $parsed.Options['f']
-    $targetDir = if ($parsed.Options['directory']) { Convert-BashPath $parsed.Options['directory'] } else { $PWD }
+    $targetDir = if ($parsed.Options['C']) { Convert-BashPath $parsed.Options['C'] } else { $PWD }
 
     if (-not $archiveFile) {
         Write-BashError -Command 'tar' -Message 'missing archive file (-f)'
