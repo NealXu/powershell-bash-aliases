@@ -2,6 +2,9 @@
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Force remove diff alias BEFORE importing module
+Remove-Item "Global:Alias:diff" -Force -ErrorAction SilentlyContinue
+
 # Import module to get properly exported functions
 Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
 
@@ -411,6 +414,46 @@ Describe "dirname" {
 
     It "Shows help" {
         $result = dirname --help
+        $result -match "Usage" | Should Be $true
+    }
+}
+
+Describe "diff" {
+    BeforeAll {
+        $testFile1 = "test-diff-file1.txt"
+        $testFile2 = "test-diff-file2.txt"
+        $testFile3 = "test-diff-file3.txt"
+
+        Set-Content -Path $testFile1 -Value "line1", "line2", "line3" -Encoding UTF8
+        Set-Content -Path $testFile2 -Value "line1", "line2-modified", "line3" -Encoding UTF8
+        Copy-Item $testFile1 $testFile3
+
+        # Get the diff function from the module
+        $script:diffFunc = Get-Command diff -CommandType Function
+    }
+
+    AfterAll {
+        Remove-Item $testFile1, $testFile2, $testFile3 -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Detects differences between files" {
+        # Invoke the diff function directly
+        $result = & $script:diffFunc $testFile1 $testFile2
+        $result -match "line2" | Should Be $true
+    }
+
+    It "Reports identical files with -s" {
+        $result = & $script:diffFunc -s $testFile1 $testFile3
+        $result -match "identical" | Should Be $true
+    }
+
+    It "Shows brief output with -q" {
+        $result = & $script:diffFunc -q $testFile1 $testFile2
+        $result -match "differ" | Should Be $true
+    }
+
+    It "Shows help" {
+        $result = & $script:diffFunc --help
         $result -match "Usage" | Should Be $true
     }
 }

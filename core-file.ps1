@@ -494,4 +494,123 @@ function dirname {
     }
 }
 
+function diff {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'q' = @{ Long = 'brief'; Type = 'switch' }
+        's' = @{ Long = 'report-identical-files'; Type = 'switch' }
+        'u' = @{ Long = 'unified'; Type = 'switch' }
+        'r' = @{ Long = 'recursive'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: diff [-q] [-s] [-u] [-r] FILE1 FILE2 [--help]'
+    }
+
+    $brief = $parsed.Options['q'] -or $parsed.LongOptions['brief']
+    $reportIdentical = $parsed.Options['s'] -or $parsed.LongOptions['report-identical-files']
+    $unified = $parsed.Options['u'] -or $parsed.LongOptions['unified']
+    $recursive = $parsed.Options['r'] -or $parsed.LongOptions['recursive']
+
+    if ($parsed.Positional.Count -lt 2) {
+        Write-BashError -Command 'diff' -Message 'missing file operand'
+        return
+    }
+
+    $file1 = Convert-BashPath $parsed.Positional[0]
+    $file2 = Convert-BashPath $parsed.Positional[1]
+
+    if (-not (Test-Path $file1)) {
+        Write-BashError -Command 'diff' -Message "cannot access '$file1'"
+        return
+    }
+
+    if (-not (Test-Path $file2)) {
+        Write-BashError -Command 'diff' -Message "cannot access '$file2'"
+        return
+    }
+
+    # Check if both are directories
+    $item1 = Get-Item $file1
+    $item2 = Get-Item $file2
+
+    if ($item1 -is [System.IO.DirectoryInfo] -and $item2 -is [System.IO.DirectoryInfo]) {
+        if ($recursive) {
+            # Compare directories recursively
+            $files1 = Get-ChildItem $file1 -Recurse -File | Select-Object -ExpandProperty FullName
+            $files2 = Get-ChildItem $file2 -Recurse -File | Select-Object -ExpandProperty FullName
+
+            foreach ($f1 in $files1) {
+                $relPath = $f1.Substring($file1.Length)
+                $f2 = "$file2$relPath"
+
+                if (Test-Path $f2) {
+                    $content1 = Get-Content $f1
+                    $content2 = Get-Content $f2
+
+                    if (Compare-Object $content1 $content2) {
+                        Write-Output "Files $f1 and $f2 differ"
+                    }
+                } else {
+                    Write-Output "Only in ${file1}: $relPath"
+                }
+            }
+        } else {
+            Write-BashError -Command 'diff' -Message 'comparing directories requires -r'
+        }
+        return
+    }
+
+    # Compare files
+    $content1 = Get-Content $file1
+    $content2 = Get-Content $file2
+
+    $diff = Compare-Object $content1 $content2
+
+    if (-not $diff) {
+        if ($reportIdentical) {
+            Write-Output "Files $file1 and $file2 are identical"
+        }
+        return
+    }
+
+    if ($brief) {
+        Write-Output "Files $file1 and $file2 differ"
+        return
+    }
+
+    # Show unified diff format
+    if ($unified) {
+        Write-Output "--- $file1"
+        Write-Output "+++ $file2"
+
+        $lineNum = 1
+        $diff | ForEach-Object {
+            $prefix = if ($_.$_.SideIndicator -eq '<=') { '-' } else { '+' }
+            Write-Output "$prefix$($_.InputObject)"
+            $lineNum++
+        }
+    } else {
+        # Show standard diff format
+        $diff | ForEach-Object {
+            if ($_.$_.SideIndicator -eq '<=') {
+                Write-Output "< $($_.InputObject)"
+            } else {
+                Write-Output "> $($_.InputObject)"
+            }
+        }
+    }
+}
+
 
