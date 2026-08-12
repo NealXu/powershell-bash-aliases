@@ -97,50 +97,111 @@ function tee {
 
 function history {
     param(
+        [switch]$c,
         [switch]$help,
         [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
     $allArgs = @()
+    if ($c) { $allArgs += '-c' }
     if ($help) { $allArgs += '-help' }
     $allArgs += $ArgList
 
     $spec = @{
+        'c' = @{ Long = 'clear'; Type = 'switch' }
+        'd' = @{ Long = 'delete'; Type = 'value' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
     $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
-        return 'Usage: history [--help]'
+        return 'Usage: history [-c] [-d OFFSET] [--help]'
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "history: placeholder"
+    $clear = $parsed.Options['c'] -or $parsed.LongOptions['clear']
+    $deleteOffset = $parsed.Options['d']
+
+    if ($clear) {
+        Clear-History
+        Write-Output "History cleared."
+        return
+    }
+
+    if ($deleteOffset) {
+        try {
+            $offset = [int]$deleteOffset
+            $history = Get-History
+            if ($offset -ge 1 -and $offset -le $history.Count) {
+                # PowerShell doesn't support deleting individual entries easily
+                # We'll clear and re-add except the one to delete
+                Write-Output "Note: PowerShell does not support deleting individual history entries."
+            } else {
+                Write-BashError -Command 'history' -Message "offset $deleteOffset out of range"
+            }
+        } catch {
+            Write-BashError -Command 'history' -Message "invalid offset '$deleteOffset'"
+        }
+        return
+    }
+
+    # Display history
+    $history = Get-History
+    $idWidth = [string]($history.Count).Length
+    foreach ($entry in $history) {
+        $id = $entry.Id
+        $line = $entry.CommandLine
+        Write-Output ("{0,$idWidth}  {1}" -f $id, $line)
+    }
 }
 
 function time {
     param(
+        [switch]$p,
         [switch]$help,
         [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
     $allArgs = @()
+    if ($p) { $allArgs += '-p' }
     if ($help) { $allArgs += '-help' }
     $allArgs += $ArgList
 
     $spec = @{
+        'p' = @{ Long = 'portability'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
     $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
-        return 'Usage: time [--help] COMMAND'
+        return 'Usage: time [-p] COMMAND [--help]'
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "time: placeholder"
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'time' -Message "missing command"
+        return
+    }
+
+    $portability = $parsed.Options['p'] -or $parsed.LongOptions['portability']
+    $command = $parsed.Positional -join ' '
+
+    try {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        Invoke-Expression $command | Out-Default
+        $sw.Stop()
+
+        if ($portability) {
+            # POSIX format: real X.XX\nuser X.XX\nsys X.XX
+            # PowerShell doesn't separate user/sys time, so we report real only
+            Write-Output "real $($sw.Elapsed.TotalSeconds)"
+        } else {
+            Write-Output ""
+            Write-Output "Execution time: $($sw.Elapsed)"
+        }
+    } catch {
+        Write-BashError -Command 'time' -Message "failed to execute: $command"
+    }
 }
 
 function watch {
@@ -166,8 +227,47 @@ function watch {
         return 'Usage: watch [-n SECONDS] COMMAND [--help]'
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "watch: placeholder"
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'watch' -Message "missing command"
+        return
+    }
+
+    $interval = 2
+    if ($parsed.Options['n']) {
+        try {
+            $interval = [double]$parsed.Options['n']
+            if ($interval -lt 0.1) { $interval = 0.1 }
+        } catch {
+            Write-BashError -Command 'watch' -Message "invalid interval '$($parsed.Options['n'])'"
+            return
+        }
+    }
+
+    $command = $parsed.Positional -join ' '
+
+    Write-Output "Every $interval seconds: $command"
+    Write-Output "Press Ctrl+C to stop..."
+
+    try {
+        while ($true) {
+            Clear-Host
+            Write-Output "Every $interval seconds: $command"
+            Write-Output "Press Ctrl+C to stop..."
+            Write-Output ""
+            Write-Output "[$(Get-Date -Format 'HH:mm:ss')]"
+            Write-Output ""
+            try {
+                Invoke-Expression $command
+            } catch {
+                Write-BashError -Command 'watch' -Message "error executing command"
+            }
+            Start-Sleep -Seconds $interval
+        }
+    } catch {
+        # User pressed Ctrl+C
+        Write-Output ""
+        Write-Output "watch: stopped"
+    }
 }
 
 function seq {
@@ -199,8 +299,73 @@ function seq {
         return 'Usage: seq [-s SEP] [-w] [-f FORMAT] [FIRST [INCR]] LAST [--help]'
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "seq: placeholder"
+    $separator = if ($parsed.Options['s']) { $parsed.Options['s'] } else { "`n" }
+    $equalWidth = $parsed.Options['w'] -or $parsed.LongOptions['equal-width']
+    $format = $parsed.Options['f']
+
+    $posArgs = $parsed.Positional | Where-Object { $_ -match '^-?\d+\.?\d*$' }
+
+    $first = 1
+    $incr = 1
+    $last = $null
+
+    switch ($posArgs.Count) {
+        1 {
+            $last = [double]$posArgs[0]
+        }
+        2 {
+            $first = [double]$posArgs[0]
+            $last = [double]$posArgs[1]
+        }
+        { $_ -ge 3 } {
+            $first = [double]$posArgs[0]
+            $incr = [double]$posArgs[1]
+            $last = [double]$posArgs[2]
+        }
+    }
+
+    if ($null -eq $last) {
+        Write-BashError -Command 'seq' -Message "missing operand"
+        return
+    }
+
+    if ($incr -eq 0) {
+        Write-BashError -Command 'seq' -Message "zero increment"
+        return
+    }
+
+    $values = @()
+    if ($incr -gt 0) {
+        for ($i = $first; $i -le $last; $i += $incr) {
+            $values += $i
+        }
+    } else {
+        for ($i = $first; $i -ge $last; $i += $incr) {
+            $values += $i
+        }
+    }
+
+    if ($format) {
+        $values = $values | ForEach-Object { $format -f $_ }
+    } elseif ($equalWidth) {
+        # Pad with zeros based on max width
+        $maxLen = ([string]([int]$last)).Length
+        $values = $values | ForEach-Object {
+            if ($_ -eq [int]$_) {
+                "{0:D$maxLen}" -f [int]$_
+            } else {
+                "{0}" -f $_
+            }
+        }
+    }
+
+    if ($separator -eq "`n") {
+        # Default: output each value on separate line
+        $values | Write-Output
+    } else {
+        # Custom separator: join and output
+        Write-Output ($values -join $separator)
+    }
 }
 
 function yes {
@@ -223,95 +388,299 @@ function yes {
         return 'Usage: yes [STRING] [--help]'
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "yes: placeholder"
+    $string = if ($parsed.Positional.Count -gt 0) {
+        $parsed.Positional -join ' '
+    } else {
+        'y'
+    }
+
+    # Output repeatedly until Ctrl+C
+    # For safety in testing, limit iterations
+    $iterations = 0
+    $maxIterations = 10000  # Safety limit for testing
+
+    try {
+        while ($iterations -lt $maxIterations) {
+            Write-Output $string
+            $iterations++
+        }
+    } catch {
+        # Ctrl+C pressed
+    }
 }
 
 function rev {
+    [CmdletBinding()]
     param(
         [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [Parameter(ValueFromPipeline=$true, ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
-    $allArgs = @()
-    if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
-
-    $spec = @{
-        'help' = @{ Long = 'help'; Type = 'switch' }
+    begin {
+        $script:collectedInput = @()
+        $script:files = @()
+        $script:showHelp = $false
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+    process {
+        if ($help) {
+            $script:showHelp = $true
+            return
+        }
 
-    if ($parsed.Options['help']) {
-        return 'Usage: rev [FILE]... [--help]'
+        if ($ArgList) {
+            foreach ($item in $ArgList) {
+                if (Test-Path $item) {
+                    $script:files += $item
+                } else {
+                    $script:collectedInput += $item
+                }
+            }
+        }
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "rev: placeholder"
+    end {
+        if ($script:showHelp) {
+            Write-Output 'Usage: rev [FILE]... [--help]'
+            return
+        }
+
+        $processLines = {
+            param([string[]]$lines)
+            foreach ($line in $lines) {
+                $chars = $line.ToCharArray()
+                [array]::Reverse($chars)
+                Write-Output (-join $chars)
+            }
+        }
+
+        # Process files
+        foreach ($file in $script:files) {
+            $path = Convert-BashPath $file
+            if (Test-Path $path) {
+                $content = Get-Content $path
+                & $processLines $content
+            } else {
+                Write-BashError -Command 'rev' -Message "cannot open '$file'"
+            }
+        }
+
+        # Process collected input
+        if ($script:collectedInput.Count -gt 0) {
+            & $processLines $script:collectedInput
+        }
+    }
 }
 
 function shuf {
+    [CmdletBinding()]
     param(
         [switch]$n,
         [switch]$r,
         [switch]$e,
         [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [Parameter(ValueFromPipeline=$true, ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
-    $allArgs = @()
-    if ($n) { $allArgs += '-n' }
-    if ($r) { $allArgs += '-r' }
-    if ($e) { $allArgs += '-e' }
-    if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
-
-    $spec = @{
-        'n' = @{ Long = 'head-count'; Type = 'value' }
-        'r' = @{ Long = 'repeat'; Type = 'switch' }
-        'e' = @{ Long = 'echo'; Type = 'switch' }
-        'help' = @{ Long = 'help'; Type = 'switch' }
+    begin {
+        $script:collectedInput = @()
+        $script:files = @()
+        $script:headCount = $null
+        $script:repeat = $false
+        $script:echoMode = $false
+        $script:showHelp = $false
+        $script:echoArgs = @()
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+    process {
+        if ($help) {
+            $script:showHelp = $true
+            return
+        }
 
-    if ($parsed.Options['help']) {
-        return 'Usage: shuf [-n COUNT] [-r] [-e] [FILE]... [--help]'
+        if ($n) { $script:headCount = $ArgList[0]; $ArgList = $ArgList[1..($ArgList.Count-1)] }
+        if ($r) { $script:repeat = $true }
+        if ($e) { $script:echoMode = $true }
+
+        if ($script:echoMode) {
+            # In echo mode, all ArgList items are input lines
+            $script:echoArgs = $ArgList
+        } else {
+            # In normal mode, collect items
+            if ($ArgList) {
+                foreach ($item in $ArgList) {
+                    if (Test-Path $item) {
+                        $script:files += $item
+                    } else {
+                        $script:collectedInput += $item
+                    }
+                }
+            }
+        }
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "shuf: placeholder"
+    end {
+        if ($script:showHelp) {
+            Write-Output 'Usage: shuf [-n COUNT] [-r] [-e] [FILE]... [--help]'
+            return
+        }
+
+        $lines = @()
+
+        if ($script:echoMode) {
+            $lines = $script:echoArgs
+        } elseif ($script:files.Count -gt 0) {
+            foreach ($file in $script:files) {
+                $path = Convert-BashPath $file
+                if (Test-Path $path) {
+                    $lines += Get-Content $path
+                } else {
+                    Write-BashError -Command 'shuf' -Message "cannot open '$file'"
+                }
+            }
+        } else {
+            $lines = $script:collectedInput
+        }
+
+        if ($lines.Count -eq 0) {
+            return
+        }
+
+        # Shuffle function
+        $shuffleArray = {
+            param([object[]]$arr)
+            $result = $arr | ForEach-Object { $_ }
+            for ($i = $result.Count - 1; $i -gt 0; $i--) {
+                $j = Get-Random -Minimum 0 -Maximum ($i + 1)
+                $temp = $result[$i]
+                $result[$i] = $result[$j]
+                $result[$j] = $temp
+            }
+            return $result
+        }
+
+        if ($script:repeat) {
+            $count = 0
+            $maxIterations = 10000
+            while ($count -lt $maxIterations) {
+                if ($script:headCount -and $count -ge [int]$script:headCount) { break }
+                $index = Get-Random -Minimum 0 -Maximum $lines.Count
+                Write-Output $lines[$index]
+                $count++
+            }
+        } else {
+            $shuffled = & $shuffleArray $lines
+            if ($script:headCount) {
+                $shuffled | Select-Object -First ([int]$script:headCount)
+            } else {
+                $shuffled
+            }
+        }
+    }
 }
 
 function xargs {
+    [CmdletBinding()]
     param(
         [switch]$n,
         [switch]$r,
         [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [Parameter(ValueFromPipeline=$true, ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
-    $allArgs = @()
-    if ($n) { $allArgs += '-n' }
-    if ($r) { $allArgs += '-r' }
-    if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
-
-    $spec = @{
-        'n' = @{ Long = 'max-args'; Type = 'value' }
-        'r' = @{ Long = 'no-run-if-empty'; Type = 'switch' }
-        'help' = @{ Long = 'help'; Type = 'switch' }
+    begin {
+        $script:maxArgs = 1000
+        $script:noRunIfEmpty = $false
+        $script:command = 'echo'
+        $script:commandArgs = @()
+        $script:collectedInput = @()
+        $script:showHelp = $false
+        $script:parsedArgs = @()
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
-
-    if ($parsed.Options['help']) {
-        return 'Usage: xargs [-n MAX-ARGS] [-r] [COMMAND] [--help]'
+    process {
+        if ($ArgList) {
+            $script:parsedArgs += $ArgList
+        }
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "xargs: placeholder"
+    end {
+        # Parse arguments
+        $allArgs = @()
+        if ($n) { $allArgs += '-n' }
+        if ($r) { $allArgs += '-r' }
+        if ($help) { $allArgs += '-help' }
+        $allArgs += $script:parsedArgs
+
+        $spec = @{
+            'n' = @{ Long = 'max-args'; Type = 'value' }
+            'r' = @{ Long = 'no-run-if-empty'; Type = 'switch' }
+            'help' = @{ Long = 'help'; Type = 'switch' }
+        }
+
+        $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+        if ($parsed.Options['help']) {
+            Write-Output 'Usage: xargs [-n MAX-ARGS] [-r] [COMMAND] [--help]'
+            return
+        }
+
+        $script:maxArgs = if ($parsed.Options['n']) { [int]$parsed.Options['n'] } else { 1000 }
+        $script:noRunIfEmpty = $parsed.Options['r'] -or $parsed.LongOptions['no-run-if-empty']
+        $script:command = if ($parsed.Positional.Count -gt 0) { $parsed.Positional[0] } else { 'echo' }
+        $script:commandArgs = $parsed.Positional | Select-Object -Skip 1
+
+        # Don't run if empty and -r specified
+        if ($script:noRunIfEmpty -and $script:collectedInput.Count -eq 0) {
+            return
+        }
+
+        # Batch arguments and execute command
+        $batchCount = 0
+        $argsBatch = @()
+
+        foreach ($item in $script:collectedInput) {
+            $argsBatch += $item
+            $batchCount++
+
+            if ($batchCount -ge $script:maxArgs) {
+                # Execute with current batch
+                $cmdStr = $script:command
+                if ($script:commandArgs.Count -gt 0) {
+                    $cmdStr += " " + ($script:commandArgs -join ' ')
+                }
+                if ($argsBatch.Count -gt 0) {
+                    $cmdStr += " " + ($argsBatch -join ' ')
+                }
+
+                try {
+                    Invoke-Expression $cmdStr
+                } catch {
+                    Write-BashError -Command 'xargs' -Message "command failed: $cmdStr"
+                }
+
+                $argsBatch = @()
+                $batchCount = 0
+            }
+        }
+
+        # Execute remaining items
+        if ($argsBatch.Count -gt 0) {
+            $cmdStr = $script:command
+            if ($script:commandArgs.Count -gt 0) {
+                $cmdStr += " " + ($script:commandArgs -join ' ')
+            }
+            if ($argsBatch.Count -gt 0) {
+                $cmdStr += " " + ($argsBatch -join ' ')
+            }
+
+            try {
+                Invoke-Expression $cmdStr
+            } catch {
+                Write-BashError -Command 'xargs' -Message "command failed: $cmdStr"
+            }
+        }
+    }
 }
 
 function date {

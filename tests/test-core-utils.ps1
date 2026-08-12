@@ -2,7 +2,7 @@
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
 
-# Force remove echo, tee, and env aliases to ensure function calls work
+# Force remove aliases to ensure function calls work
 Remove-Item "Global:Alias:echo" -Force -ErrorAction SilentlyContinue
 Remove-Item "Global:Alias:tee" -Force -ErrorAction SilentlyContinue
 Remove-Item "Global:Alias:env" -Force -ErrorAction SilentlyContinue
@@ -99,5 +99,88 @@ Describe "env" {
     It "Does not throw when called" {
         # Verify env doesn't throw when called
         { env } | Should Not Throw
+    }
+}
+
+Describe "history" {
+    It "Displays history without error" {
+        { history } | Should Not Throw
+    }
+}
+
+Describe "time" {
+    It "Shows help" {
+        $result = time --help
+        $result | Should Match "Usage"
+    }
+
+    It "Times a simple command" {
+        { time echo "test" } | Should Not Throw
+    }
+}
+
+Describe "seq" {
+    It "Shows help" {
+        $result = seq --help
+        $result | Should Match "Usage"
+    }
+
+    It "Generates sequence to N" {
+        $result = seq 5
+        $result.Count | Should BeGreaterThan 0
+    }
+
+    It "Uses custom separator" {
+        $result = seq -s " " 3
+        $result | Should Not Be $null
+    }
+}
+
+Describe "yes" {
+    It "Shows help" {
+        $result = yes --help
+        $result | Should Match "Usage"
+    }
+
+    It "Outputs custom string" {
+        $result = yes "hello" | Select-Object -First 3
+        $result.Count | Should Be 3
+    }
+}
+
+Describe "rev" {
+    It "Reverses lines from pipeline" {
+        $result = "hello" | rev
+        $result | Should Be "olleh"
+    }
+
+    It "Reverses multiple lines" {
+        $result = "abc","def" | rev
+        $result[0] | Should Be "cba"
+        $result[1] | Should Be "fed"
+    }
+}
+
+Describe "shuf" {
+    It "Shuffles lines from pipeline" {
+        $result = "a","b","c" | shuf
+        $result.Count | Should Be 3
+    }
+
+    It "Handles -e flag for echo mode" {
+        $result = shuf -e "x" "y" "z"
+        $result.Count | Should Be 3
+    }
+}
+
+Describe "xargs" {
+    It "Shows help" {
+        $result = xargs --help
+        $result | Should Match "Usage"
+    }
+
+    It "Respects -r flag" {
+        $result = @() | xargs -r echo
+        $result | Should Be $null
     }
 }
