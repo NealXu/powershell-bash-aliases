@@ -20,7 +20,7 @@ foreach ($a in $aliases) {
     Remove-Item "Global:Alias:$a" -Force -ErrorAction SilentlyContinue
 }
 
-Export-ModuleMember -Function ls, ll, cat, rm, mkdir, cp, mv, touch, head, tail, wc, sort, uniq, grep, find, which, ps, kill, curl, ping, less, df, du, uptime, uname, hostname, netstat, wget, killall, top, cut, tr, yolo, yoloc, echo, tee, history, time, watch, seq, yes, rev, shuf, xargs, tar, zip, unzip, gzip, gunzip, bzip2, bunzip2
+Export-ModuleMember -Function ls, ll, cat, rm, mkdir, cp, mv, touch, head, tail, wc, sort, uniq, grep, find, which, ps, kill, curl, ping, less, df, du, uptime, uname, hostname, netstat, wget, killall, top, cut, tr, yolo, yoloc, echo, tee, history, time, watch, seq, yes, rev, shuf, xargs, tar, zip, unzip, gzip, gunzip, bzip2, bunzip2, basename, dirname
 
 # PSReadLine key bindings (align with WSL bash readline)
 Import-Module PSReadLine -ErrorAction SilentlyContinue

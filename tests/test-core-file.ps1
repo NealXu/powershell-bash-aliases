@@ -370,3 +370,47 @@ Describe "ll parameter tests" {
         Remove-Item $emptyDir -Force -ErrorAction SilentlyContinue
     }
 }
+
+Describe "basename" {
+    It "Extracts filename from path" {
+        $result = basename "/path/to/file.txt"
+        $result | Should Be "file.txt"
+    }
+
+    It "Handles Windows paths" {
+        $result = basename "C:\Users\test\document.txt"
+        $result | Should Be "document.txt"
+    }
+
+    It "Removes suffix with -s option" {
+        $result = basename -s ".txt" "/path/to/file.txt"
+        $result | Should Be "file"
+    }
+
+    It "Shows help" {
+        $result = basename --help
+        $result -match "Usage" | Should Be $true
+    }
+}
+
+Describe "dirname" {
+    It "Extracts directory from path" {
+        $result = dirname "/path/to/file.txt"
+        $result | Should Be "\path\to"
+    }
+
+    It "Handles Windows paths" {
+        $result = dirname "C:\Users\test\document.txt"
+        $result | Should Be "C:\Users\test"
+    }
+
+    It "Returns dot for filename without directory" {
+        $result = dirname "file.txt"
+        $result | Should Be "."
+    }
+
+    It "Shows help" {
+        $result = dirname --help
+        $result -match "Usage" | Should Be $true
+    }
+}

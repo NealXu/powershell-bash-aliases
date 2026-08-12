@@ -405,4 +405,93 @@ function ll {
     }
 }
 
+function basename {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'a' = @{ Long = 'multiple'; Type = 'switch' }
+        's' = @{ Long = 'suffix'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: basename [-a] [-s SUFFIX] NAME [SUFFIX]... [--help]'
+    }
+
+    $multiple = $parsed.Options['a'] -or $parsed.LongOptions['multiple']
+    $suffix = $parsed.Options['s']
+
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'basename' -Message 'missing operand'
+        return
+    }
+
+    foreach ($path in $parsed.Positional) {
+        $p = Convert-BashPath $path
+        $name = [System.IO.Path]::GetFileName($p)
+
+        # Remove trailing slashes for directory paths
+        $name = $name.TrimEnd('\', '/')
+
+        # Remove suffix if specified
+        if ($suffix -and $name.EndsWith($suffix)) {
+            $name = $name.Substring(0, $name.Length - $suffix.Length)
+        }
+
+        Write-Output $name
+
+        if (-not $multiple) {
+            break
+        }
+    }
+}
+
+function dirname {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'z' = @{ Long = 'zero'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: dirname [-z] NAME... [--help]'
+    }
+
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'dirname' -Message 'missing operand'
+        return
+    }
+
+    foreach ($path in $parsed.Positional) {
+        $p = Convert-BashPath $path
+        $dir = [System.IO.Path]::GetDirectoryName($p)
+
+        # Handle root paths and paths without directory components
+        if ([string]::IsNullOrEmpty($dir)) {
+            $dir = '.'
+        }
+
+        Write-Output $dir
+    }
+}
+
 
