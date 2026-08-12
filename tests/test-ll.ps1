@@ -1,8 +1,13 @@
 # tests\test-ll.ps1
+# Fix: Use explicit function calls
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $scriptDir "..\utils.ps1")
-. (Join-Path $scriptDir "..\core-file.ps1")
+
+# Import module to get ll function
+Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
+
+# Get ll function reference
+$script:llFunc = Get-Command ll -CommandType Function -ErrorAction SilentlyContinue
 
 Describe "ll" {
     BeforeAll {
@@ -15,12 +20,12 @@ Describe "ll" {
     }
 
     It "ll command exists" {
-        $result = ll $testDir
+        $result = & $script:llFunc $testDir
         $result -match "file1.txt" | Should Be $true
     }
 
     It "ll outputs long format" {
-        $result = ll $testDir
+        $result = & $script:llFunc $testDir
         $result -match "rw" | Should Be $true
     }
 }

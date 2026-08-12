@@ -1,4 +1,5 @@
-# tests\test-core-process.ps1 (兼容 Pester 3.4.0)
+# tests\test-core-process.ps1 (compatible with Pester 3.4.0)
+# Fix: Use explicit function calls to avoid PowerShell alias and parameter conflicts
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
@@ -9,56 +10,61 @@ Remove-Item "Global:Alias:kill" -Force -ErrorAction SilentlyContinue
 # Import module to get properly exported functions
 Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
 
+# Get function references to bypass PowerShell alias priority
+$script:psFunc = Get-Command ps -CommandType Function -ErrorAction SilentlyContinue
+$script:killFunc = Get-Command kill -CommandType Function -ErrorAction SilentlyContinue
+$script:killallFunc = Get-Command killall -CommandType Function -ErrorAction SilentlyContinue
+$script:topFunc = Get-Command top -CommandType Function -ErrorAction SilentlyContinue
+$script:pgrepFunc = Get-Command pgrep -CommandType Function -ErrorAction SilentlyContinue
+$script:pkillFunc = Get-Command pkill -CommandType Function -ErrorAction SilentlyContinue
+$script:jobsFunc = Get-Command jobs -CommandType Function -ErrorAction SilentlyContinue
+$script:bgFunc = Get-Command bg -CommandType Function -ErrorAction SilentlyContinue
+$script:fgFunc = Get-Command fg -CommandType Function -ErrorAction SilentlyContinue
+$script:nohupFunc = Get-Command nohup -CommandType Function -ErrorAction SilentlyContinue
+
 Describe "ps" {
     It "Lists processes" {
-        $result = ps
+        $result = & $script:psFunc
         $result.Count | Should BeGreaterThan 0
     }
 
-    It "Shows all processes with -e" {
-        $result = ps -e
+    It "Shows all processes with dash e" {
+        $result = & $script:psFunc -e
         $result.Count | Should BeGreaterThan 10
     }
 
     It "Shows help" {
-        $result = ps -Help
+        $result = & $script:psFunc -Help
         $result -match "Usage" | Should Be $true
     }
 
     It "Limits to 10 processes by default" {
         $procs = Get-Process
-        $result = ps
-        # ps returns a formatted table, not limited to 10 processes
-        # Verify it returns some output
+        $result = & $script:psFunc
         $result.Count | Should BeGreaterThan 0
     }
 }
 
 Describe "kill" {
-    It "Shows signal list with -l" {
-        $result = kill -l
+    It "Shows signal list with dash l" {
+        $result = & $script:killFunc -l
         $result -match "Signals" | Should Be $true
     }
 
     It "Shows help" {
-        $result = kill -Help
+        $result = & $script:killFunc -Help
         $result -match "Usage" | Should Be $true
     }
 
     It "Accepts process ID parameter" {
-        # 创建一个短暂进程用于测试
         $proc = Start-Process -FilePath "powershell" -ArgumentList "-Command", "Start-Sleep -Seconds 5" -PassThru
         $procId = $proc.Id
         try {
-            # 验证进程存在
             Get-Process -Id $procId -ErrorAction SilentlyContinue | Should Not Be $null
-            # 终止进程
-            kill -Id $procId
+            & $script:killFunc -Id $procId
             Start-Sleep -Seconds 1
-            # 验证进程已终止
             { Get-Process -Id $procId -ErrorAction Stop } | Should Throw
         } catch {
-            # 清理
             Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
         }
     }
@@ -66,103 +72,92 @@ Describe "kill" {
 
 Describe "killall" {
     It "Shows help" {
-        $result = killall -Help
+        $result = & $script:killallFunc -Help
         $result -match "Usage" | Should Be $true
     }
 
     It "Accepts process name parameter" {
-        # 使用已存在的进程名称测试（不会真正终止）
         $procsBefore = Get-Process -Name "explorer" -ErrorAction SilentlyContinue
         if ($procsBefore) {
-            # 测试语法正确性，但不实际终止 explorer
-            { killall -Name "nonexistent_process_xyz" } | Should Not Throw
+            { & $script:killallFunc -Name "nonexistent_process_xyz" } | Should Not Throw
         }
     }
 }
 
 Describe "top" {
     It "Shows help" {
-        $result = top --help
+        $result = & $script:topFunc --help
         $result -match "Usage" | Should Be $true
     }
 
     It "Shows top processes by memory" {
-        # Note: top may fail on processes with null CPU, so we just verify help works
-        $result = top --help
+        $result = & $script:topFunc --help
         $result | Should Not Be $null
     }
 
     It "Limits output to N processes" {
-        # Note: top may fail on processes with null CPU, so we just verify help works
-        $result = top --help
+        $result = & $script:topFunc --help
         $result | Should Not Be $null
     }
 
-    It "Uses default n=10" {
-        # Note: top may fail on processes with null CPU, so we just verify help works
-        $result = top --help
+    It "Uses default n equals 10" {
+        $result = & $script:topFunc --help
         $result | Should Not Be $null
     }
 }
 
-Describe "ps parameter tests" {
-    It "Shows detailed format with -f" {
-        $result = ps -f
-        # -f 输出应该包含 CPU, WorkingSet 等信息
-        $true | Should Be $true  # 验证函数可执行
+Describe "ps-params" {
+    It "Shows detailed format with dash f" {
+        $result = & $script:psFunc -f
+        $true | Should Be $true
     }
 
-    It "Accepts -u user filter" {
-        # -u 参数应该过滤用户
+    It "Accepts dash u user filter" {
         $code = Get-Content (Join-Path $scriptDir "..\core-process.ps1") -Raw
         $code -match "UserName" | Should Be $true
     }
 
-    It "Combines -e and -f" {
-        $result = ps -e -f
-        $true | Should Be $true  # 验证组合参数可执行
+    It "Combines dash e and dash f" {
+        $result = & $script:psFunc -e -f
+        $true | Should Be $true
     }
 }
 
-Describe "kill parameter tests" {
-    It "Accepts -Name parameter" {
-        # 验证代码逻辑
+Describe "kill-params" {
+    It "Accepts dash Name parameter" {
         $code = Get-Content (Join-Path $scriptDir "..\core-process.ps1") -Raw
         $code -match "Stop-Process.*-Name" | Should Be $true
     }
 
     It "Handles non-existent process gracefully" {
-        # kill doesn't throw for non-existent process, it writes an error
-        # We just verify it doesn't throw an exception
-        { kill -Id 999999 } | Should Not Throw
+        { & $script:killFunc -Id 999999 } | Should Not Throw
     }
 }
 
 Describe "pgrep" {
     It "Shows help" {
-        $result = pgrep --help
+        $result = & $script:pgrepFunc --help
         $result -match "Usage" | Should Be $true
     }
 
     It "Finds processes by pattern" {
-        $result = pgrep -l "power"
+        $result = & $script:pgrepFunc -l "power"
         $result.Count | Should BeGreaterThan 0
     }
 
-    It "Returns only PIDs without -l" {
-        $result = pgrep "power"
+    It "Returns only PIDs without dash l" {
+        $result = & $script:pgrepFunc "power"
         $result -match "^\d+$" | Should Be $true
     }
 }
 
 Describe "pkill" {
     It "Shows help" {
-        $result = pkill --help
+        $result = & $script:pkillFunc --help
         $result -match "Usage" | Should Be $true
     }
 
     It "Accepts pattern parameter" {
-        # 验证代码逻辑
         $code = Get-Content (Join-Path $scriptDir "..\core-process.ps1") -Raw
         $code -match "Stop-Process" | Should Be $true
     }
@@ -170,16 +165,16 @@ Describe "pkill" {
 
 Describe "jobs" {
     It "Shows help" {
-        $result = jobs --help
+        $result = & $script:jobsFunc --help
         $result -match "Usage" | Should Be $true
     }
 
     It "Lists no jobs when empty" {
-        $result = jobs
+        $result = & $script:jobsFunc
         $result -match "No background jobs" | Should Be $true
     }
 
-    It "Accepts -l flag" {
+    It "Accepts dash l flag" {
         $code = Get-Content (Join-Path $scriptDir "..\core-process.ps1") -Raw
         $code -match "list" | Should Be $true
     }
@@ -187,38 +182,36 @@ Describe "jobs" {
 
 Describe "bg" {
     It "Shows help" {
-        $result = bg --help
+        $result = & $script:bgFunc --help
         $result -match "Usage" | Should Be $true
     }
 
     It "Errors when no job" {
-        $result = bg 2>&1
+        $result = & $script:bgFunc 2>&1
         $result -match "invalid job ID" | Should Be $true
     }
 }
 
 Describe "fg" {
     It "Shows help" {
-        $result = fg --help
+        $result = & $script:fgFunc --help
         $result -match "Usage" | Should Be $true
     }
 
     It "Errors when no job" {
-        $result = fg 2>&1
+        $result = & $script:fgFunc 2>&1
         $result -match "invalid job ID" | Should Be $true
     }
 }
 
 Describe "nohup" {
     It "Shows help" {
-        $result = nohup --help
+        $result = & $script:nohupFunc --help
         $result -match "Usage" | Should Be $true
     }
 
     It "Accepts command parameter" {
-        # nohup without a command runs an empty command in background
-        # We just verify it doesn't throw
-        { nohup } | Should Not Throw
+        { & $script:nohupFunc } | Should Not Throw
     }
 
     It "Uses Start-Job for background execution" {

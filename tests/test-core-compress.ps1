@@ -1,9 +1,19 @@
-# tests\test-core-compress.ps1 (兼容 Pester 3.4.0)
+# tests\test-core-compress.ps1 (compatible with Pester 3.4.0)
+# Fix: Use explicit function calls to avoid PowerShell alias conflicts
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $scriptDir "..\args-parser.ps1")
-. (Join-Path $scriptDir "..\utils.ps1")
-. (Join-Path $scriptDir "..\core-compress.ps1")
+
+# Import module to get properly exported functions
+Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
+
+# Get function references
+$script:tarFunc = Get-Command tar -CommandType Function -ErrorAction SilentlyContinue
+$script:zipFunc = Get-Command zip -CommandType Function -ErrorAction SilentlyContinue
+$script:unzipFunc = Get-Command unzip -CommandType Function -ErrorAction SilentlyContinue
+$script:gzipFunc = Get-Command gzip -CommandType Function -ErrorAction SilentlyContinue
+$script:gunzipFunc = Get-Command gunzip -CommandType Function -ErrorAction SilentlyContinue
+$script:bzip2Func = Get-Command bzip2 -CommandType Function -ErrorAction SilentlyContinue
+$script:bunzip2Func = Get-Command bunzip2 -CommandType Function -ErrorAction SilentlyContinue
 
 Describe "tar" {
     BeforeAll {
@@ -18,7 +28,7 @@ Describe "tar" {
         Remove-Item "test-archive.tar.gz" -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = tar --help
+        $result = & $script:tarFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Creates archive" {
@@ -50,7 +60,7 @@ Describe "zip" {
         Remove-Item "test-archive.zip" -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = zip --help
+        $result = & $script:zipFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Creates zip archive" {
@@ -75,11 +85,11 @@ Describe "unzip" {
         Remove-Item "test-unzip-out" -Recurse -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = unzip --help
+        $result = & $script:unzipFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Lists archive contents" {
-        $result = unzip -l test-unzip.zip
+        $result = & $script:unzipFunc -l test-unzip.zip
         $result -match "test-unzip-file.txt" | Should Be $true
     }
     It "Extracts archive" {
@@ -98,7 +108,7 @@ Describe "gzip" {
         Remove-Item "test-gzip-file.txt.gz" -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = gzip --help
+        $result = & $script:gzipFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Compresses file" {
@@ -127,7 +137,7 @@ Describe "gunzip" {
         Remove-Item "$testFile.gz" -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = gunzip --help
+        $result = & $script:gunzipFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Decompresses file" {
@@ -154,7 +164,7 @@ Describe "bzip2" {
         Remove-Item "$testFile.bz2" -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = bzip2 --help
+        $result = & $script:bzip2Func --help
         $result -match "Usage" | Should Be $true
     }
     It "Shows compression implementation code" {
@@ -173,7 +183,7 @@ Describe "bzip2" {
 
 Describe "bunzip2" {
     It "Shows help" {
-        $result = bunzip2 --help
+        $result = & $script:bunzip2Func --help
         $result -match "Usage" | Should Be $true
     }
     It "Shows decompression implementation code" {

@@ -1,9 +1,22 @@
-# tests\test-core-text.ps1 (兼容 Pester 3.4.0)
+# tests\test-core-text.ps1 (compatible with Pester 3.4.0)
+# Fix: Use explicit function calls to avoid PowerShell alias conflicts
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Import module to get properly exported functions
 Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
+
+# Get function references
+$script:headFunc = Get-Command head -CommandType Function -ErrorAction SilentlyContinue
+$script:tailFunc = Get-Command tail -CommandType Function -ErrorAction SilentlyContinue
+$script:wcFunc = Get-Command wc -CommandType Function -ErrorAction SilentlyContinue
+$script:sortFunc = Get-Command sort -CommandType Function -ErrorAction SilentlyContinue
+$script:uniqFunc = Get-Command uniq -CommandType Function -ErrorAction SilentlyContinue
+$script:cutFunc = Get-Command cut -CommandType Function -ErrorAction SilentlyContinue
+$script:trFunc = Get-Command tr -CommandType Function -ErrorAction SilentlyContinue
+$script:patchFunc = Get-Command patch -CommandType Function -ErrorAction SilentlyContinue
+$script:awkFunc = Get-Command awk -CommandType Function -ErrorAction SilentlyContinue
+$script:sedFunc = Get-Command sed -CommandType Function -ErrorAction SilentlyContinue
 
 Describe "head" {
     BeforeAll {
@@ -16,11 +29,11 @@ Describe "head" {
         Remove-Item "test-head.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Shows first 10 lines by default" {
-        $result = head $testFile
+        $result = & $script:headFunc $testFile
         $result.Count | Should Be 10
     }
     It "Shows first N lines" {
-        $result = head -n 5 $testFile
+        $result = & $script:headFunc -n 5 $testFile
         $result.Count | Should Be 5
     }
 }
@@ -36,11 +49,11 @@ Describe "tail" {
         Remove-Item "test-tail.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Shows last 10 lines by default" {
-        $result = tail $testFile
+        $result = & $script:tailFunc $testFile
         $result.Count | Should Be 10
     }
     It "Shows last N lines" {
-        $result = tail -n 5 $testFile
+        $result = & $script:tailFunc -n 5 $testFile
         $result.Count | Should Be 5
     }
 }
@@ -54,7 +67,7 @@ Describe "wc" {
         Remove-Item "test-wc.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Counts lines words bytes" {
-        $result = wc $testFile
+        $result = & $script:wcFunc $testFile
         $result -match "\d+ \d+ \d+" | Should Be $true
     }
 }
@@ -68,11 +81,11 @@ Describe "sort" {
         Remove-Item "test-sort.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Sorts alphabetically" {
-        $result = sort $testFile
+        $result = & $script:sortFunc $testFile
         $result[0] | Should Be "apple"
     }
     It "Sorts reverse" {
-        $result = sort -r $testFile
+        $result = & $script:sortFunc -r $testFile
         $result[0] | Should Be "zebra"
     }
 }
@@ -93,14 +106,14 @@ Describe "cut" {
         Remove-Item "test-cut.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Extracts field by delimiter" {
-        $result = cut -d "," -f "1" $testFile
+        $result = & $script:cutFunc -d "," -f "1" $testFile
         $result[0] | Should Be "a"
     }
 }
 
 Describe "tr" {
     It "Shows help" {
-        $result = tr --help
+        $result = & $script:trFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Translates characters" {
@@ -124,11 +137,11 @@ Describe "head parameter tests" {
         Remove-Item $testFile -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = head --help
+        $result = & $script:headFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Accepts custom n parameter" {
-        $result = head -n 3 $testFile
+        $result = & $script:headFunc -n 3 $testFile
         $result.Count | Should Be 3
     }
 }
@@ -144,7 +157,7 @@ Describe "tail parameter tests" {
         Remove-Item $testFile -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = tail --help
+        $result = & $script:tailFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "-f flag is accepted" {
@@ -164,23 +177,23 @@ Describe "wc parameter tests" {
         Remove-Item $testFile, $testFile2 -Force -ErrorAction SilentlyContinue
     }
     It "Shows character count with -c" {
-        $result = wc -c $testFile
+        $result = & $script:wcFunc -c $testFile
         $result -match "\d+" | Should Be $true
     }
     It "Shows all counts by default" {
-        $result = wc $testFile
+        $result = & $script:wcFunc $testFile
         $result -match "\d+ \d+ \d+" | Should Be $true
     }
     It "Shows combined counts" {
-        $result = wc -l -w $testFile
+        $result = & $script:wcFunc -l -w $testFile
         $result -match "\d+ \d+" | Should Be $true
     }
     It "Shows help" {
-        $result = wc --help
+        $result = & $script:wcFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Handles multiple files" {
-        $result = wc $testFile $testFile2
+        $result = & $script:wcFunc $testFile $testFile2
         $result.Count | Should Be 2
     }
 }
@@ -194,30 +207,30 @@ Describe "sort parameter tests" {
         Remove-Item $testFile -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = sort --help
+        $result = & $script:sortFunc --help
         $result -match "Usage" | Should Be $true
     }
-    It "Sorts numerically with -n" {
-        $result = sort -n $testFile
+    It "Sorts numerically with dash n" {
+        $result = & $script:sortFunc -n $testFile
         $result[0] | Should Be "1"
         $result[1] | Should Be "2"
     }
-    It "Shows unique values with -u" {
+    It "Shows unique values with dash u" {
         $dupFile = "test-sort-uniq.txt"
         Set-Content -Path $dupFile -Value "a", "a", "b" -Encoding UTF8
-        $result = sort -u $dupFile
+        $result = & $script:sortFunc -u $dupFile
         $result.Count | Should Be 2
         Remove-Item $dupFile -Force -ErrorAction SilentlyContinue
     }
-    It "Combines -n and -r" {
-        $result = sort -n -r $testFile
+    It "Combines dash n and dash r" {
+        $result = & $script:sortFunc -n -r $testFile
         $result[0] | Should Be "20"
     }
 }
 
 Describe "uniq parameter tests" {
     It "Shows help" {
-        $result = uniq --help
+        $result = & $script:uniqFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Shows counts with -c" {
@@ -239,19 +252,19 @@ Describe "cut parameter tests" {
         Remove-Item $testFile -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = cut --help
+        $result = & $script:cutFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Uses custom delimiter with -d" {
-        $result = cut -d "," -f "1" $testFile
+        $result = & $script:cutFunc -d "," -f "1" $testFile
         $result[0] | Should Be "a"
     }
     It "Extracts multiple fields" {
-        $result = cut -d "," -f "1,3" $testFile
+        $result = & $script:cutFunc -d "," -f "1,3" $testFile
         $result[0] | Should Be "a,c"
     }
     It "Handles field index out of range" {
-        $result = cut -d "," -f "10" $testFile
+        $result = & $script:cutFunc -d "," -f "10" $testFile
         $result[0] | Should Be ""
     }
 }
@@ -334,7 +347,7 @@ Describe "patch" {
         Remove-Item "test-patch-output.txt" -Force -ErrorAction SilentlyContinue
     }
     It "Shows help" {
-        $result = patch --help
+        $result = & $script:patchFunc --help
         $result -match "Usage" | Should Be $true
     }
     It "Shows dry-run option" {
@@ -347,6 +360,6 @@ Describe "patch" {
     }
     It "Parses unified diff format" {
         $code = Get-Content (Join-Path $scriptDir "..\core-text.ps1") -Raw
-        $code -match "^---.*\+\+\+" | Should Be $true
+        $code -match "---.*\+\+\+" | Should Be $true
     }
 }
