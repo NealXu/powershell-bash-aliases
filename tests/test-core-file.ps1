@@ -144,6 +144,28 @@ Describe "ls parameter tests" {
     AfterAll {
         Remove-Item "test-ls-params" -Recurse -Force -ErrorAction SilentlyContinue
     }
+    It "Handles empty string path without error" {
+        # Test for null/empty path protection
+        $errorOccurred = $false
+        try {
+            $result = ls -l ""
+        } catch {
+            $errorOccurred = $true
+        }
+        # Should not throw parameter binding error
+        $errorOccurred | Should Be $false
+    }
+    It "Handles whitespace-only path without error" {
+        # Test for whitespace path protection
+        $errorOccurred = $false
+        try {
+            $result = ls -l "   "
+        } catch {
+            $errorOccurred = $true
+        }
+        # Should not throw parameter binding error
+        $errorOccurred | Should Be $false
+    }
     It "Shows hidden files with -a" {
         $result = ls -a $testDir
         $result -match "\.hidden" | Should Be $true

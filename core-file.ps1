@@ -34,6 +34,7 @@
 
     foreach ($Path in $paths) {
         $Path = Convert-BashPath $Path
+        if ([string]::IsNullOrWhiteSpace($Path)) { continue }
         if (-not (Test-Path $Path)) {
             Write-BashError -Command 'ls' -Message "cannot access '$Path'"
             continue
