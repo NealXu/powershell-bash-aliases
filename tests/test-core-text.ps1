@@ -1,9 +1,9 @@
 # tests\test-core-text.ps1 (兼容 Pester 3.4.0)
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $scriptDir "..\args-parser.ps1")
-. (Join-Path $scriptDir "..\utils.ps1")
-. (Join-Path $scriptDir "..\core-text.ps1")
+
+# Import module to get properly exported functions
+Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
 
 Describe "head" {
     BeforeAll {

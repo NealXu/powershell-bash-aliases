@@ -8,37 +8,47 @@ Remove-Item "Global:Alias:tee" -Force -ErrorAction SilentlyContinue
 Remove-Item "Global:Alias:env" -Force -ErrorAction SilentlyContinue
 
 Describe "echo" {
+    BeforeAll {
+        # Get the echo function from the module
+        $script:echoFunc = Get-Command echo -CommandType Function -ErrorAction SilentlyContinue
+    }
+
     It "Outputs text" {
-        $result = echo "Hello World"
+        $result = & $script:echoFunc "Hello World"
         $result | Should Be "Hello World"
     }
 
     It "Outputs without newline with -n" {
         # Note: -n uses Write-Host -NoNewline, so we just verify it doesn't throw
-        { echo -n "test" } | Should Not Throw
+        { & $script:echoFunc -n "test" } | Should Not Throw
     }
 
     It "Parses escape sequences with --enable-escape" {
-        $result = echo --enable-escape "Line1\nLine2"
+        $result = & $script:echoFunc --enable-escape "Line1\nLine2"
         $result | Should Be "Line1
 Line2"
     }
 
     It "Handles multiple arguments" {
-        $result = echo "Hello" "World"
+        $result = & $script:echoFunc "Hello" "World"
         $result | Should Be "Hello World"
     }
 
     It "Shows help" {
-        $result = echo --help
+        $result = & $script:echoFunc --help
         $result | Should Match "Usage"
     }
 }
 
 Describe "tee" {
+    BeforeAll {
+        # Get the tee function from the module
+        $script:teeFunc = Get-Command tee -CommandType Function -ErrorAction SilentlyContinue
+    }
+
     It "Writes to file and stdout" {
         $testFile = "$env:TEMP\tee-test-$(Get-Random).txt"
-        $result = "Hello World" | tee $testFile
+        $result = "Hello World" | & $script:teeFunc $testFile
         $result | Should Be "Hello World"
         Get-Content $testFile | Should Be "Hello World"
         Remove-Item $testFile -Force -ErrorAction SilentlyContinue
@@ -47,7 +57,7 @@ Describe "tee" {
     It "Appends to file with -a" {
         $testFile = "$env:TEMP\tee-append-$(Get-Random).txt"
         Set-Content $testFile "Line1"
-        $result = "Line2" | tee -a $testFile
+        $result = "Line2" | & $script:teeFunc -a $testFile
         $result | Should Be "Line2"
         $content = Get-Content $testFile
         $content.Count | Should Be 2
@@ -59,7 +69,7 @@ Describe "tee" {
     It "Handles multiple files" {
         $testFile1 = "$env:TEMP\tee-multi1-$(Get-Random).txt"
         $testFile2 = "$env:TEMP\tee-multi2-$(Get-Random).txt"
-        $result = "Test" | tee $testFile1 $testFile2
+        $result = "Test" | & $script:teeFunc $testFile1 $testFile2
         $result | Should Be "Test"
         Get-Content $testFile1 | Should Be "Test"
         Get-Content $testFile2 | Should Be "Test"
@@ -67,7 +77,7 @@ Describe "tee" {
     }
 
     It "Shows help" {
-        $result = tee --help
+        $result = & $script:teeFunc --help
         $result | Should Match "Usage"
     }
 }

@@ -1,12 +1,18 @@
 # tests\test-core-network.ps1 (兼容 Pester 3.4.0)
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $scriptDir "..\utils.ps1")
-. (Join-Path $scriptDir "..\core-network.ps1")
+
+# Import module to get properly exported functions
+Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
 
 Describe "curl" {
+    BeforeAll {
+        # Get the curl function from the module
+        $script:curlFunc = Get-Command curl -CommandType Function -ErrorAction SilentlyContinue
+    }
+
     It "Shows help" {
-        $result = curl -Help
+        $result = & $script:curlFunc --help
         $result -match "Usage" | Should Be $true
     }
 
