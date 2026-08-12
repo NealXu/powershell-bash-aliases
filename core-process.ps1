@@ -137,3 +137,339 @@ function top {
         Write-Output "$($p.Id.ToString().PadLeft(6)) $($p.ProcessName.PadRight(16)) $($p.CPU.ToString('N1').PadLeft(6))  $mem"
     }
 }
+
+# Global job tracking
+$script:JobTable = @{}
+
+function jobs {
+    param(
+        [switch]$l, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($l) { $allArgs += '-l' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'l' = @{ Long = 'list'; Type = 'switch' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: jobs [-l] [--help]'
+    }
+
+    $listPids = $parsed.Options['l'] -or $parsed.LongOptions['list']
+
+    # Clean up completed jobs
+    $activeJobs = @{}
+    foreach ($key in $script:JobTable.Keys) {
+        $job = $script:JobTable[$key]
+        if ($job.PSObject.Properties['State'] -and $job.State -eq 'Completed') {
+            # Job completed, remove from table
+            continue
+        }
+        $activeJobs[$key] = $job
+    }
+    $script:JobTable = $activeJobs
+
+    if ($script:JobTable.Count -eq 0) {
+        Write-Output 'No background jobs'
+        return
+    }
+
+    $idx = 1
+    foreach ($key in $script:JobTable.Keys) {
+        $job = $script:JobTable[$key]
+        $status = if ($job.State) { $job.State } else { 'Running' }
+        $command = if ($job.Command) { $job.Command } elseif ($job.Name) { $job.Name } else { 'Unknown' }
+
+        if ($listPids) {
+            $pid = if ($job.Id) { $job.Id } else { 'N/A' }
+            Write-Output "[$idx]  PID $pid  $status  $command"
+        } else {
+            Write-Output "[$idx]  $status  $command"
+        }
+        $idx++
+    }
+}
+
+function bg {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: bg [JOB_ID] [--help]'
+    }
+
+    # PowerShell jobs don't have true background/foreground like Unix
+    # This is a simplified implementation
+
+    if ($parsed.Positional.Count -eq 0) {
+        # Resume most recent stopped job
+        if ($script:JobTable.Count -eq 0) {
+            Write-BashError -Command 'bg' -Message 'no current job'
+            return
+        }
+        $jobKey = $script:JobTable.Keys | Select-Object -Last 1
+        $job = $script:JobTable[$jobKey]
+    } else {
+        $jobId = $parsed.Positional[0]
+        if ($jobId -match '^\d+$') {
+            $idx = [int]$jobId
+            $keys = @($script:JobTable.Keys)
+            if ($idx -lt 1 -or $idx -gt $keys.Count) {
+                Write-BashError -Command 'bg' -Message "job $jobId not found"
+                return
+            }
+            $jobKey = $keys[$idx - 1]
+            $job = $script:JobTable[$jobKey]
+        } else {
+            Write-BashError -Command 'bg' -Message "invalid job ID: $jobId"
+            return
+        }
+    }
+
+    # Resume job in background
+    if ($job -and $job.PSObject.Properties['State']) {
+        Receive-Job -Job $job -Force -ErrorAction SilentlyContinue
+        Write-Output "Background job resumed"
+    } else {
+        Write-BashError -Command 'bg' -Message 'job not found'
+    }
+}
+
+function fg {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: fg [JOB_ID] [--help]'
+    }
+
+    if ($parsed.Positional.Count -eq 0) {
+        # Bring most recent job to foreground
+        if ($script:JobTable.Count -eq 0) {
+            Write-BashError -Command 'fg' -Message 'no current job'
+            return
+        }
+        $jobKey = $script:JobTable.Keys | Select-Object -Last 1
+        $job = $script:JobTable[$jobKey]
+    } else {
+        $jobId = $parsed.Positional[0]
+        if ($jobId -match '^\d+$') {
+            $idx = [int]$jobId
+            $keys = @($script:JobTable.Keys)
+            if ($idx -lt 1 -or $idx -gt $keys.Count) {
+                Write-BashError -Command 'fg' -Message "job $jobId not found"
+                return
+            }
+            $jobKey = $keys[$idx - 1]
+            $job = $script:JobTable[$jobKey]
+        } else {
+            Write-BashError -Command 'fg' -Message "invalid job ID: $jobId"
+            return
+        }
+    }
+
+    # Bring job to foreground and wait for it
+    if ($job -and $job.PSObject.Properties['State']) {
+        Write-Output "Bringing job to foreground..."
+        Wait-Job -Job $job -Timeout -1 -ErrorAction SilentlyContinue
+        Receive-Job -Job $job -ErrorAction SilentlyContinue
+        Remove-Job -Job $job -ErrorAction SilentlyContinue
+        $script:JobTable.Remove($jobKey)
+    } else {
+        Write-BashError -Command 'fg' -Message 'job not found'
+    }
+}
+
+function nohup {
+    param(
+        [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: nohup COMMAND [ARGS]... [--help]'
+    }
+
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'nohup' -Message 'missing command'
+        return
+    }
+
+    $command = $parsed.Positional[0]
+    $arguments = $parsed.Positional[1..($parsed.Positional.Count - 1)]
+
+    # Create output file
+    $nohupOut = Join-Path $PWD 'nohup.out'
+
+    # Start the command as a PowerShell background job
+    $scriptBlock = {
+        param($cmd, $args)
+        & $cmd @args
+    }
+
+    try {
+        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $command, $arguments
+
+        # Track job in our table
+        $jobInfo = @{
+            Job = $job
+            Command = "$command $arguments"
+            StartTime = Get-Date
+        }
+        $script:JobTable[$job.Id] = $jobInfo
+
+        Write-Output "Started background job: $command"
+        Write-Output "Job ID: $($job.Id)"
+        Write-Output "Output appended to: $nohupOut"
+
+        # Capture output to nohup.out
+        Register-ObjectEvent -InputObject $job -EventName StateChanged -Action {
+            $job = $Event.MessageData
+            if ($job.State -eq 'Completed') {
+                $output = Receive-Job -Job $job -ErrorAction SilentlyContinue
+                $output | Out-File -FilePath (Join-Path $PWD 'nohup.out') -Append -Encoding UTF8
+                Remove-Job -Job $job -Force
+            }
+        } | Out-Null
+
+    } catch {
+        Write-BashError -Command 'nohup' -Message $_.Exception.Message
+    }
+}
+
+function pgrep {
+    param(
+        [switch]$l, [switch]$u, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($l) { $allArgs += '-l' }
+    if ($u) { $allArgs += '-u' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'l' = @{ Long = 'list-name'; Type = 'switch' }
+        'u' = @{ Long = 'user'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: pgrep [-l] [-u USER] PATTERN [--help]'
+    }
+
+    $showName = $parsed.Options['l'] -or $parsed.LongOptions['list-name']
+    $userFilter = $parsed.Options['u']
+
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'pgrep' -Message 'missing pattern'
+        return
+    }
+
+    $pattern = $parsed.Positional[0]
+
+    $procs = Get-Process | Where-Object { $_.ProcessName -like "*$pattern*" }
+
+    if ($userFilter) {
+        $procs = $procs | Where-Object { $_.UserName -like "*$userFilter*" }
+    }
+
+    foreach ($proc in $procs) {
+        if ($showName) {
+            Write-Output "$($proc.Id) $($proc.ProcessName)"
+        } else {
+            Write-Output $proc.Id
+        }
+    }
+}
+
+function pkill {
+    param(
+        [switch]$u, [switch]$help,
+        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+    )
+
+    $allArgs = @()
+    if ($u) { $allArgs += '-u' }
+    if ($help) { $allArgs += '-help' }
+    $allArgs += $ArgList
+
+    $spec = @{
+        'u' = @{ Long = 'user'; Type = 'value' }
+        'help' = @{ Long = 'help'; Type = 'switch' }
+    }
+
+    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+    if ($parsed.Options['help']) {
+        return 'Usage: pkill [-u USER] PATTERN [--help]'
+    }
+
+    $userFilter = $parsed.Options['u']
+
+    if ($parsed.Positional.Count -eq 0) {
+        Write-BashError -Command 'pkill' -Message 'missing pattern'
+        return
+    }
+
+    $pattern = $parsed.Positional[0]
+
+    $procs = Get-Process | Where-Object { $_.ProcessName -like "*$pattern*" }
+
+    if ($userFilter) {
+        $procs = $procs | Where-Object { $_.UserName -like "*$userFilter*" }
+    }
+
+    foreach ($proc in $procs) {
+        try {
+            Stop-Process -Id $proc.Id -Force
+        } catch {
+            Write-BashError -Command 'pkill' -Message "cannot kill process $($proc.Id)"
+        }
+    }
+}

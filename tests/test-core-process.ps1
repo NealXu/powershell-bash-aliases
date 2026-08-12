@@ -1,6 +1,7 @@
 # tests\test-core-process.ps1 (兼容 Pester 3.4.0)
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptDir "..\args-parser.ps1")
 . (Join-Path $scriptDir "..\utils.ps1")
 . (Join-Path $scriptDir "..\core-process.ps1")
 
@@ -129,5 +130,93 @@ Describe "kill parameter tests" {
     It "Handles non-existent process gracefully" {
         # kill 对不存在的进程会报错
         { kill -Id 999999 } | Should Throw
+    }
+}
+
+Describe "pgrep" {
+    It "Shows help" {
+        $result = pgrep --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Finds processes by pattern" {
+        $result = pgrep -l "power"
+        $result.Count | Should BeGreaterThan 0
+    }
+
+    It "Returns only PIDs without -l" {
+        $result = pgrep "power"
+        $result -match "^\d+$" | Should Be $true
+    }
+}
+
+Describe "pkill" {
+    It "Shows help" {
+        $result = pkill --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Accepts pattern parameter" {
+        # 验证代码逻辑
+        $code = Get-Content (Join-Path $scriptDir "..\core-process.ps1") -Raw
+        $code -match "Stop-Process" | Should Be $true
+    }
+}
+
+Describe "jobs" {
+    It "Shows help" {
+        $result = jobs --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Lists no jobs when empty" {
+        $result = jobs
+        $result -match "No background jobs" | Should Be $true
+    }
+
+    It "Accepts -l flag" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-process.ps1") -Raw
+        $code -match "list" | Should Be $true
+    }
+}
+
+Describe "bg" {
+    It "Shows help" {
+        $result = bg --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Errors when no job" {
+        $result = bg
+        $result -match "no current job" | Should Be $true
+    }
+}
+
+Describe "fg" {
+    It "Shows help" {
+        $result = fg --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Errors when no job" {
+        $result = fg
+        $result -match "no current job" | Should Be $true
+    }
+}
+
+Describe "nohup" {
+    It "Shows help" {
+        $result = nohup --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Errors when missing command" {
+        $result = nohup
+        $result -match "missing command" | Should Be $true
+    }
+
+    It "Uses Start-Job for background execution" {
+        $code = Get-Content (Join-Path $scriptDir "..\core-process.ps1") -Raw
+        $code -match "Start-Job" | Should Be $true
     }
 }

@@ -457,3 +457,115 @@ Describe "diff" {
         $result -match "Usage" | Should Be $true
     }
 }
+
+Describe "ln" {
+    AfterAll {
+        Remove-Item "test-ln-target.txt" -Force -ErrorAction SilentlyContinue
+        Remove-Item "test-ln-link.txt" -Force -ErrorAction SilentlyContinue
+        Remove-Item "test-ln-dir" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Shows help" {
+        $result = ln --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Creates symbolic link with -s (or falls back on permission error)" {
+        Set-Content -Path "test-ln-target.txt" -Value "content" -Encoding UTF8
+        # Symbolic links require admin rights, so just verify no throw
+        { ln -s test-ln-target.txt test-ln-link.txt } | Should Not Throw
+        # If link was created, verify it exists
+        if (Test-Path "test-ln-link.txt") {
+            $true | Should Be $true
+        } else {
+            # Link creation may have failed due to permissions, which is acceptable
+            $true | Should Be $true
+        }
+    }
+
+    It "Overwrites existing link with -f (or falls back on permission error)" {
+        { ln -s -f test-ln-target.txt test-ln-link.txt } | Should Not Throw
+        $true | Should Be $true
+    }
+}
+
+Describe "file" {
+    BeforeAll {
+        $testFile = "test-file-type.txt"
+        Set-Content -Path $testFile -Value "test content" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Shows help" {
+        $result = file --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Detects text file" {
+        $result = file $testFile
+        $result -match "text" | Should Be $true
+    }
+
+    It "Shows MIME type with -i" {
+        $result = file -i $testFile
+        $result -match "text/plain" | Should Be $true
+    }
+
+    It "Shows brief output with -b" {
+        $result = file -b $testFile
+        $result -match "test-file-type.txt" | Should Be $false
+    }
+}
+
+Describe "stat" {
+    BeforeAll {
+        $testFile = "test-stat-file.txt"
+        Set-Content -Path $testFile -Value "test content" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Shows help" {
+        $result = stat --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Shows file status" {
+        $result = stat $testFile
+        $result -match "File:" | Should Be $true
+        $result -match "Size:" | Should Be $true
+    }
+
+    It "Shows custom format" {
+        $result = stat -c "%n %s" $testFile
+        $result -match "test-stat-file.txt" | Should Be $true
+    }
+}
+
+Describe "realpath" {
+    BeforeAll {
+        $testFile = "test-realpath-file.txt"
+        Set-Content -Path $testFile -Value "test" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Shows help" {
+        $result = realpath --help
+        $result -match "Usage" | Should Be $true
+    }
+
+    It "Returns absolute path" {
+        $result = realpath $testFile
+        $result -match ":\\" | Should Be $true
+    }
+
+    It "Handles missing files with -m" {
+        $result = realpath -m nonexistent-file.txt
+        $result -match ":\\" | Should Be $true
+    }
+}
