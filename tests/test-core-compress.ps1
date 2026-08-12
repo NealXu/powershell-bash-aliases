@@ -146,7 +146,8 @@ Describe "gunzip" {
         & $script:gzipFunc $testFile2
         & $script:gunzipFunc -k "$testFile2.gz"
         Test-Path "$testFile2.gz" | Should Be $true
-        Remove-Item "$testFile2.gz" -Force -ErrorAction SilentlyContinue
+        # gunzip -k 保留源文件,需一并清理,避免在仓库根目录留下 test-gunzip-keep.txt
+        Remove-Item $testFile2, "$testFile2.gz" -Force -ErrorAction SilentlyContinue
     }
 }
 

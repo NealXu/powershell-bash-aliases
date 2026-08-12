@@ -36,8 +36,8 @@ Describe "echo" {
 
     It "Parses escape sequences with dash dash enable-escape" {
         $result = & $script:echoFunc --enable-escape "Line1\nLine2"
-        $result | Should Be "Line1
-Line2"
+        # 期望值用显式 LF(反引号n),避免依赖测试文件自身的 CRLF 行尾导致不匹配
+        $result | Should Be "Line1`nLine2"
     }
 
     It "Handles multiple arguments" {

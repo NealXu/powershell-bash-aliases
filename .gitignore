@@ -13,6 +13,10 @@
 test-*-temp/
 test-*-params/
 
+# 曾经误提交过的测试/开发残留(--help 空文件、tee-test.txt),防止再次进入版本库
+/--help
+/tee-*.txt
+
 # Pester test result files
 test-results*.xml
 test-failures*.xml

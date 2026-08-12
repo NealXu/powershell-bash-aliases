@@ -15,8 +15,14 @@ Import-Module Pester -ErrorAction Stop
 Write-Host "Running all tests..." -ForegroundColor Cyan
 Write-Host "==================" -ForegroundColor Cyan
 
-# 运行所有测试
-$result = Invoke-Pester -Path $testsDir -PassThru
+# 显式收集测试文件。Pester 3.x 默认只发现 *.Tests.ps1,而本项目测试命名为 test-*.ps1,
+# 直接传目录会导致 0 个测试被运行,让失败和文件污染都无法被发现。
+# 注意:不能把测试隔离到临时目录运行 —— 压缩类函数用 .NET File API 打开相对路径,
+# 而 .NET 进程当前目录不跟随 PowerShell 的 Push-Location,会导致找不到测试文件。
+$testScripts = @(Get-ChildItem -Path $testsDir -Filter '*.ps1' | Where-Object { $_.Name -ne 'run-tests.ps1' })
+
+# 运行所有测试(在仓库根目录 cwd 下运行,与模块实现一致)
+$result = Invoke-Pester -Path ($testScripts | ForEach-Object { $_.FullName }) -PassThru
 
 Write-Host ""
 Write-Host "Test Results Summary:" -ForegroundColor Yellow
