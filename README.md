@@ -7,11 +7,11 @@
 
 ## 简介
 
-PowerShell Bash-Aliases 是一个 PowerShell 模块，提供 31 个 bash 风格命令的 PowerShell 实现。让你在 Windows 上使用熟悉的 Linux 命令操作文件系统、查看系统信息、管理进程等。
+PowerShell Bash-Aliases 是一个 PowerShell 模块，提供 **66 个** bash 风格命令的 PowerShell 实现。让你在 Windows 上使用熟悉的 Linux 命令操作文件系统、查看系统信息、管理进程等。
 
 ## 特性
 
-- ✅ **31 个常用 bash 命令** - 覆盖文件、文本、搜索、系统、进程、网络六大类别
+- ✅ **66 个常用 bash 命令** - 覆盖文件、文本、搜索、系统、进程、网络、压缩、工具八大类别
 - ✅ **参数风格兼容** - 支持 `-a`、`-l`、`--help` 等 bash 风格参数
 - ✅ **彩色输出** - 目录和可执行文件自动着色，与 WSL dircolors 一致
 - ✅ **自动加载** - 安装后自动导入，开箱即用
