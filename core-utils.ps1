@@ -44,28 +44,55 @@ function echo {
 }
 
 function tee {
+    [CmdletBinding()]
     param(
         [switch]$a,
         [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
-    $allArgs = @()
-    if ($a) { $allArgs += '-a' }
-    $allArgs += $ArgList
+    begin {
+        $allArgs = @()
+        if ($a) { $allArgs += '-a' }
+        $allArgs += $ArgList
 
-    $spec = @{
-        'a' = @{ Long = 'append'; Type = 'switch' }
-        'help' = @{ Long = 'help'; Type = 'switch' }
+        $spec = @{
+            'a' = @{ Long = 'append'; Type = 'switch' }
+            'help' = @{ Long = 'help'; Type = 'switch' }
+        }
+
+        $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+
+        if ($parsed.Options['help']) {
+            return 'Usage: tee [-a] [FILE]...'
+        }
+
+        $script:appendMode = $parsed.Options['a'] -or $parsed.LongOptions['append']
+        $script:files = $parsed.Positional | ForEach-Object { Convert-BashPath $_ }
+        $script:output = @()
     }
 
-    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
-
-    if ($parsed.Options['help']) {
-        return 'Usage: tee [-a] [FILE]...'
+    process {
+        # Collect all input
+        $script:output += $Input
     }
 
-    # Placeholder - will be implemented in later task
-    Write-Output "tee: placeholder"
+    end {
+        if ($script:output.Count -eq 0) {
+            return
+        }
+
+        # Write to each file
+        foreach ($file in $script:files) {
+            if ($script:appendMode) {
+                $script:output | Add-Content -Path $file -Encoding UTF8
+            } else {
+                $script:output | Set-Content -Path $file -Encoding UTF8
+            }
+        }
+
+        # Output to stdout
+        $script:output | Write-Output
+    }
 }
 
 function history {
