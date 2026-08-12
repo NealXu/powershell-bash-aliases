@@ -2,8 +2,13 @@
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Force remove diff alias BEFORE importing module
+# Force remove conflicting aliases BEFORE importing module
 Remove-Item "Global:Alias:diff" -Force -ErrorAction SilentlyContinue
+Remove-Item "Global:Alias:ls" -Force -ErrorAction SilentlyContinue
+Remove-Item "Global:Alias:cat" -Force -ErrorAction SilentlyContinue
+Remove-Item "Global:Alias:rm" -Force -ErrorAction SilentlyContinue
+Remove-Item "Global:Alias:cp" -Force -ErrorAction SilentlyContinue
+Remove-Item "Global:Alias:mv" -Force -ErrorAction SilentlyContinue
 
 # Import module to get properly exported functions
 Import-Module (Join-Path $scriptDir "..\bash-aliases.psm1") -Force
