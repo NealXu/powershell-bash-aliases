@@ -133,3 +133,32 @@ Describe "df edge cases" {
         $code -match "total -gt 0" | Should Be $true
     }
 }
+
+Describe "free" {
+    It "Shows memory usage" {
+        $result = free
+        $result -match "Mem:" | Should Be $true
+    }
+
+    It "Shows human-readable with -h" {
+        $result = free -h
+        $result -match "K|M|G" | Should Be $true
+    }
+
+    It "Shows help" {
+        $result = free --help
+        $result -match "Usage" | Should Be $true
+    }
+}
+
+Describe "whoami" {
+    It "Shows current user" {
+        $result = whoami
+        $result -match "\\" | Should Be $true
+    }
+
+    It "Shows help" {
+        $result = whoami --help
+        $result -match "Usage" | Should Be $true
+    }
+}
