@@ -79,6 +79,26 @@ Describe "tar coverage" {
         $s -match [regex]::Escape($script:tarArch) | Should Be $true
     }
 
+    It "tar accepts short -help and shows usage" {
+        $r = & $script:tarFunc -help
+        @($r)[0] -match 'Usage: tar' | Should Be $true
+    }
+
+    It "tar create accepts -v verbose flag" {
+        $r = & $script:tarFunc -c -v -f $script:tarArch $script:tarSrc
+        (@($r) -join ' ') -match '\-cf' | Should Be $true
+    }
+
+    It "tar create accepts -j bzip2 flag" {
+        $r = & $script:tarFunc -c -j -f $script:tarArch $script:tarSrc
+        (@($r) -join ' ') -match '\-cf' | Should Be $true
+    }
+
+    It "tar extract honors -C target directory" {
+        $r = & $script:tarFunc -x -C $script:tarWork -f $script:tarArch
+        (@($r) -join ' ') -match 'MOCK-TAR' | Should Be $true
+    }
+
     It "tar extract passes -xf to native tar" {
         $r = & $script:tarFunc -x -f $script:tarArch
         $s = (@($r) -join ' ')
