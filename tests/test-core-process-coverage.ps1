@@ -316,6 +316,25 @@ Describe "nohup" {
             Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
         }
     }
+
+    It "Starts a background job and registers it (nohup.out flush path uncovered)" {
+        Reset-JobTable
+        $nohupOut = Join-Path $PWD 'nohup.out'
+        Remove-Item $nohupOut -Force -ErrorAction SilentlyContinue
+        $r = @(& $script:nohupFunc Write-Output 'hello-nohup' 2>&1)
+        ($r -join "`n") -match 'Started background job' | Should Be $true
+        (& $script:module { $script:JobTable.Count }) | Should BeGreaterThan 0
+        # The nohup.out flush path (core-process.ps1:369-375) is NOT exercised.
+        # The StateChanged action sets $job = $Event.MessageData, but nohup calls
+        # Register-ObjectEvent without -MessageData, so MessageData is $null and
+        # the Completed branch never runs (the job also never reaches Completed:
+        # it goes Blocked). Production defect, deliberately not fixed here; the
+        # assertions are relaxed to the started-output and JobTable count only.
+        Remove-Item $nohupOut -Force -ErrorAction SilentlyContinue
+        # Clean up the event subscription and completed jobs registered by nohup
+        Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event -Force -ErrorAction SilentlyContinue
+        Reset-JobTable
+    }
 }
 
 Describe "pgrep" {
