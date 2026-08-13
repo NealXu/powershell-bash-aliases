@@ -52,5 +52,59 @@ Describe "e2e: installed module import via manifest" {
     }
 }
 
+Describe "e2e: installed command smoke" {
+    It "ls lists a temp directory's files" {
+        $dir = Join-Path $env:TEMP ('e2e-ls-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        New-Item -ItemType File -Path (Join-Path $dir 'alpha.txt') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $dir 'sub') -Force | Out-Null
+        try {
+            Push-Location $dir
+            $out = @(& $script:lsFunc)
+            $out | Should Not BeNullOrEmpty
+            ($out -join ' ') | Should Match 'alpha.txt'
+            ($out -join ' ') | Should Match 'sub'
+        } finally {
+            Pop-Location
+            Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "cat prints file content" {
+        $file = Join-Path $env:TEMP ('e2e-cat-' + [guid]::NewGuid().ToString('N') + '.txt')
+        Set-Content -Path $file -Value @('line one', 'line two') -Encoding ASCII
+        try {
+            $out = @(& $script:catFunc $file)
+            ($out -join ' ') | Should Match 'line one'
+            ($out -join ' ') | Should Match 'line two'
+        } finally {
+            Remove-Item $file -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "nohup starts a background job and writes nohup.out" {
+        $dir = Join-Path $env:TEMP ('e2e-nohup-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        Push-Location $dir
+        try {
+            $nohupOut = Join-Path $dir 'nohup.out'
+            $r = @(& $script:nohupFunc Write-Output 'e2e-nohup-marker' 2>&1)
+            ($r -join "`n") -match 'Started background job' | Should Be $true
+            $deadline = (Get-Date).AddSeconds(15)
+            while (-not (Test-Path $nohupOut) -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 250
+            }
+            Test-Path $nohupOut | Should Be $true
+            (Get-Content $nohupOut -Raw) -match 'e2e-nohup-marker' | Should Be $true
+        } finally {
+            Pop-Location
+            Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+            Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event -Force -ErrorAction SilentlyContinue
+            Get-Job | Stop-Job -ErrorAction SilentlyContinue
+            Get-Job | Remove-Job -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # --- Teardown: remove the temp install (runs after all Describes above) ---
 Remove-Item $script:e2eInstall -Recurse -Force -ErrorAction SilentlyContinue
