@@ -25,18 +25,19 @@ $script:trFunc    = Get-Command tr    -CommandType Function -ErrorAction Silentl
 $script:uniqFunc  = Get-Command uniq  -CommandType Function -ErrorAction SilentlyContinue
 $script:awkFunc   = Get-Command awk   -CommandType Function -ErrorAction SilentlyContinue
 
-# The production tr / uniq / awk functions declare
+# The production tr / uniq functions declare
 # [Parameter(ValueFromRemainingArguments=$true)] on their ArgList parameter.  That
 # attribute makes them *advanced* functions which reject pipeline input into the
-# automatic $input variable, so they cannot be driven through a pipeline.  awk also
-# has a runtime collision between its foreach ($f in $files) loop variable and its
-# [switch]$F parameter (PowerShell variables are case-insensitive).
+# automatic $input variable, so they cannot be driven through a pipeline.
 #
 # To exercise the identical body logic, we build simple-function copies whose
 # parameter block is replaced with `param()` + `$ArgList = @($args)`.  A simple
 # function accepts pipeline input through $input, and $args still collects every
 # positional / short-flag argument so Parse-BashArgs behaves exactly as in the
 # production body.
+#
+# awk takes its input as file arguments (not a pipeline), so it needs no copy:
+# we call the real awk function directly so Pester can attribute its coverage.
 function Get-CopySource {
     param([string]$FuncName, [string]$NewName)
     $body = (Get-Command $FuncName -CommandType Function -ErrorAction SilentlyContinue).Definition
@@ -51,11 +52,9 @@ function Get-CopySource {
 
 Invoke-Expression (Get-CopySource -FuncName 'tr'   -NewName 'tr_copy')
 Invoke-Expression (Get-CopySource -FuncName 'uniq' -NewName 'uniq_copy')
-Invoke-Expression (Get-CopySource -FuncName 'awk'  -NewName 'awk_copy')
 
 $script:trCopy   = Get-Command tr_copy   -CommandType Function -ErrorAction SilentlyContinue
 $script:uniqCopy = Get-Command uniq_copy -CommandType Function -ErrorAction SilentlyContinue
-$script:awkCopy  = Get-Command awk_copy  -CommandType Function -ErrorAction SilentlyContinue
 
 Describe "patch" {
     BeforeAll {
@@ -332,7 +331,6 @@ Describe "awk" {
         Set-Content -Path $script:aData -Value @('apple 10 red','banana 20 yellow','cherry 30 red') -Encoding UTF8
         $script:aCsv = Join-Path $script:aTmp 'csv.txt'
         Set-Content -Path $script:aCsv -Value @('a,b,c','x,y,z') -Encoding UTF8
-        $script:awkCopy = Get-Command awk_copy -CommandType Function -ErrorAction SilentlyContinue
         $script:awkFunc = Get-Command awk -CommandType Function -ErrorAction SilentlyContinue
     }
     AfterAll {
@@ -345,52 +343,52 @@ Describe "awk" {
     }
 
     It "{print $N} prints a single field" {
-        $r = & $script:awkCopy '{print $1}' $script:aData
+        $r = & $script:awkFunc '{print $1}' $script:aData
         $r -join '|' | Should Be 'apple|banana|cherry'
     }
 
     It "-F changes the field separator" {
-        $r = & $script:awkCopy -F ',' '{print $2}' $script:aCsv
+        $r = & $script:awkFunc -F ',' '{print $2}' $script:aCsv
         $r -join '|' | Should Be 'b|y'
     }
 
     It "/pattern/ {print $N} applies a pattern action" {
-        $r = & $script:awkCopy '/red/ {print $1}' $script:aData
+        $r = & $script:awkFunc '/red/ {print $1}' $script:aData
         $r -join '|' | Should Be 'apple|cherry'
     }
 
     It "print $N without braces prints a field" {
-        $r = & $script:awkCopy 'print $2' $script:aData
+        $r = & $script:awkFunc 'print $2' $script:aData
         $r -join '|' | Should Be '10|20|30'
     }
 
     It "{print} defaults to the whole line" {
-        $r = & $script:awkCopy '{print}' $script:aData
+        $r = & $script:awkFunc '{print}' $script:aData
         $r -join '|' | Should Be 'apple 10 red|banana 20 yellow|cherry 30 red'
     }
 
     It "unmatched patterns print the whole line" {
-        $r = & $script:awkCopy '$0' $script:aData
+        $r = & $script:awkFunc '$0' $script:aData
         $r -join '|' | Should Be 'apple 10 red|banana 20 yellow|cherry 30 red'
     }
 
     It "-v accepts a variable assignment" {
-        $r = & $script:awkCopy -v 'x=5' '{print $1}' $script:aData
+        $r = & $script:awkFunc -v 'x=5' '{print $1}' $script:aData
         $r -join '|' | Should Be 'apple|banana|cherry'
     }
 
     It "processes multiple files in sequence" {
-        $r = & $script:awkCopy '{print $1}' $script:aData $script:aCsv
+        $r = & $script:awkFunc '{print $1}' $script:aData $script:aCsv
         $r -join '|' | Should Be 'apple|banana|cherry|a,b,c|x,y,z'
     }
 
     It "reports an error when the program is missing" {
-        $r = & $script:awkCopy 'not-a-program.txt' 2>$null
+        $r = & $script:awkFunc 'not-a-program.txt' 2>$null
         $null -eq $r | Should Be $true
     }
 
     It "reports an error when a file cannot be accessed" {
-        $r = & $script:awkCopy '{print $1}' (Join-Path $script:aTmp 'missing.txt') 2>$null
+        $r = & $script:awkFunc '{print $1}' (Join-Path $script:aTmp 'missing.txt') 2>$null
         $null -eq $r | Should Be $true
     }
 }

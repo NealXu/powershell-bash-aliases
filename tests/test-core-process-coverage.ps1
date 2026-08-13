@@ -136,6 +136,23 @@ Describe "bg" {
         { & $script:bgFunc 1 } | Should Not Throw
         (& $script:module { $script:JobTable.Count }) | Should Be 1
     }
+
+    It "Resumes the most recent job when no id is given" {
+        $job = Start-Job -ScriptBlock { Start-Sleep -Seconds 30 }
+        Set-JobTable @{ 'j1' = $job }
+        # -ArgList @() is required: invoking a Get-Command function reference with
+        # no arguments on PowerShell 5.1 binds a phantom empty string into the
+        # ValueFromRemainingArguments param, which would hit the "invalid job ID"
+        # branch instead of the most-recent-job path.
+        { & $script:bgFunc -ArgList @() } | Should Not Throw
+        (& $script:module { $script:JobTable.Count }) | Should Be 1
+    }
+
+    It "Reports job not found when the job has no State property" {
+        Set-JobTable @{ 'j1' = @{ Id = 99 } }
+        $result = @(& $script:bgFunc 1 2>&1)
+        $result[0].ToString() -match 'job not found' | Should Be $true
+    }
 }
 
 Describe "fg" {
@@ -167,6 +184,22 @@ Describe "fg" {
         $result = @(& $script:fgFunc 1 2>&1)
         ($result -join "`n") -match 'Bringing job to foreground' | Should Be $true
         (& $script:module { $script:JobTable.Count }) | Should Be 0
+    }
+
+    It "Brings the most recent job to the foreground when no id is given" {
+        $job = Start-Job -ScriptBlock { Start-Sleep -Milliseconds 300; Write-Output 'fg-done' }
+        Set-JobTable @{ 'j1' = $job }
+        # -ArgList @() required: see the bg "most recent job" test for the
+        # PowerShell 5.1 phantom empty-argument quirk explanation.
+        $result = @(& $script:fgFunc -ArgList @() 2>&1)
+        ($result -join "`n") -match 'Bringing job to foreground' | Should Be $true
+        (& $script:module { $script:JobTable.Count }) | Should Be 0
+    }
+
+    It "Reports job not found when the job has no State property" {
+        Set-JobTable @{ 'j1' = @{ Id = 99 } }
+        $result = @(& $script:fgFunc 1 2>&1)
+        $result[0].ToString() -match 'job not found' | Should Be $true
     }
 }
 
@@ -282,6 +315,25 @@ Describe "nohup" {
             Pop-Location
             Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
         }
+    }
+
+    It "Starts a background job and registers it (nohup.out flush path uncovered)" {
+        Reset-JobTable
+        $nohupOut = Join-Path $PWD 'nohup.out'
+        Remove-Item $nohupOut -Force -ErrorAction SilentlyContinue
+        $r = @(& $script:nohupFunc Write-Output 'hello-nohup' 2>&1)
+        ($r -join "`n") -match 'Started background job' | Should Be $true
+        (& $script:module { $script:JobTable.Count }) | Should BeGreaterThan 0
+        # The nohup.out flush path (core-process.ps1:369-375) is NOT exercised.
+        # The StateChanged action sets $job = $Event.MessageData, but nohup calls
+        # Register-ObjectEvent without -MessageData, so MessageData is $null and
+        # the Completed branch never runs (the job also never reaches Completed:
+        # it goes Blocked). Production defect, deliberately not fixed here; the
+        # assertions are relaxed to the started-output and JobTable count only.
+        Remove-Item $nohupOut -Force -ErrorAction SilentlyContinue
+        # Clean up the event subscription and completed jobs registered by nohup
+        Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event -Force -ErrorAction SilentlyContinue
+        Reset-JobTable
     }
 }
 

@@ -32,83 +32,61 @@ Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor Red
 Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor Gray
 Write-Host ""
 
-# 估算覆盖率
-Write-Host "Coverage Estimation:" -ForegroundColor Yellow
+# 真实命令级覆盖率（Pester -CodeCoverage）
+Write-Host ""
+Write-Host "Coverage (Pester -CodeCoverage, command-level):" -ForegroundColor Yellow
 
 $coreFiles = @(
-    "utils.ps1",
-    "core-file.ps1",
-    "core-text.ps1",
-    "core-search.ps1",
-    "core-process.ps1",
-    "core-network.ps1",
-    "core-view.ps1",
-    "core-system.ps1",
-    "core-edit.ps1",
-    "core-utils.ps1"
-)
+    "args-parser.ps1", "utils.ps1", "core-file.ps1", "core-text.ps1",
+    "core-search.ps1", "core-process.ps1", "core-network.ps1", "core-view.ps1",
+    "core-system.ps1", "core-utils.ps1", "core-compress.ps1", "core-edit.ps1"
+) | ForEach-Object { Join-Path $scriptDir "..\$_" }
 
-$testFiles = @(
-    "test-utils.ps1",
-    "test-core-file.ps1",
-    "test-core-text.ps1",
-    "test-core-search.ps1",
-    "test-core-process.ps1",
-    "test-core-network.ps1",
-    "test-core-view.ps1",
-    "test-core-system.ps1",
-    "test-core-edit.ps1",
-    "test-ll.ps1",
-    "test-bootstrap.ps1"
-)
+# 需要重新带覆盖率跑一遍（上面第 25 行已跑过一次无覆盖的，为拿覆盖率结果再跑一次）
+$covResult = Invoke-Pester -Path ($testScripts | ForEach-Object { $_.FullName }) -CodeCoverage $coreFiles -PassThru
 
-# 统计每个核心文件的函数数
-$functionCounts = @{
-    "utils.ps1" = 5      # Format-FileSize, Format-FileTime, Format-UnixMode, Format-Columns, Convert-BashPath
-    "core-file.ps1" = 8  # ls, cat, rm, mkdir, cp, mv, touch, ll
-    "core-text.ps1" = 7  # head, tail, wc, sort, uniq, cut, tr
-    "core-search.ps1" = 3 # grep, find, which
-    "core-process.ps1" = 4 # ps, kill, killall, top
-    "core-network.ps1" = 4 # curl, ping, netstat, wget
-    "core-view.ps1" = 1   # less
-    "core-system.ps1" = 6 # df, du, uptime, uname, hostname, yolo/yoloc
-    "core-edit.ps1" = 5   # Get-GitVimPath, Resolve-Editor, Build-VimArgs, vim, vi
-    "core-utils.ps1" = 13 # echo, tee, history, time, watch, seq, yes, rev, shuf, xargs, date, env, cd
+if ($covResult.FailedCount -gt 0) {
+    Write-Host "WARNING: $($covResult.FailedCount) test(s) failed during the coverage run (run 2)." -ForegroundColor Red
 }
 
-# 估算每个核心文件的测试覆盖函数数
-$coveredFunctions = @{
-    "utils.ps1" = 5
-    "core-file.ps1" = 8
-    "core-text.ps1" = 7
-    "core-search.ps1" = 3
-    "core-process.ps1" = 4
-    "core-network.ps1" = 4
-    "core-view.ps1" = 1
-    "core-system.ps1" = 5  # yolo/yoloc 未测试
-    "core-edit.ps1" = 5
-    "core-utils.ps1" = 13
-}
+$cc = $covResult.CodeCoverage
+if ($cc) {
+    $executed = $cc.NumberOfCommandsExecuted
+    $analyzed = $cc.NumberOfCommandsAnalyzed
+    $pct = if ($analyzed -gt 0) { [Math]::Round(($executed / $analyzed) * 100, 1) } else { 0 }
 
-$totalFunctions = 0
-$totalCovered = 0
+    Write-Host "  Commands executed/analyzed: $executed/$analyzed = $pct%" -ForegroundColor $(if ($pct -ge 85) { "Green" } else { "Yellow" })
 
-foreach ($file in $coreFiles) {
-    $totalFunctions += $functionCounts[$file]
-    $covered = $coveredFunctions[$file]
-    $totalCovered += $covered
-    $coveragePercent = [Math]::Round(($covered / $functionCounts[$file]) * 100)
-    Write-Host "  ${file}: $coveragePercent% ($covered/$($functionCounts[$file]) functions)"
-}
+    $missed = @($cc.MissedCommands)
+    Write-Host "  Missed by file (count):"
+    $missed | Group-Object File | Sort-Object Count -Descending | ForEach-Object {
+        Write-Host ("    {0}: {1}" -f (Split-Path $_.Name -Leaf), $_.Count)
+    }
 
-$overallCoverage = [Math]::Round(($totalCovered / $totalFunctions) * 100)
-Write-Host ""
-Write-Host "Overall Estimated Coverage: $overallCoverage% ($totalCovered/$totalFunctions functions)" -ForegroundColor $(if ($overallCoverage -ge 85) { "Green" } else { "Yellow" })
+    Write-Host "  Missed by function (top 15):"
+    $missed | Group-Object { "$(Split-Path $_.File -Leaf).$($_.Function)" } |
+        Sort-Object Count -Descending | Select-Object -First 15 | ForEach-Object {
+        Write-Host ("    {0}: {1}" -f $_.Name, $_.Count)
+    }
 
-if ($overallCoverage -ge 85) {
-    Write-Host "Coverage target of 85% achieved!" -ForegroundColor Green
+    if ($pct -ge 85) {
+        Write-Host ""
+        Write-Host "Coverage target of 85% achieved: $pct%" -ForegroundColor Green
+    } else {
+        Write-Host ""
+        Write-Host "Coverage $pct% below target of 85%. See Missed by function above." -ForegroundColor Yellow
+    }
+
+    Write-Host ""
+    Write-Host "Known caveats (Pester 3.4.0):" -ForegroundColor Gray
+    Write-Host "  * CoveragePercent property reports 0; percentage computed manually." -ForegroundColor Gray
+    Write-Host "  * tr/uniq are tested via dynamically-defined *_copy functions;" -ForegroundColor Gray
+    Write-Host "    their execution is not attributed to core-text.ps1, so their" -ForegroundColor Gray
+    Write-Host "    coverage is understated here. Real coverage is higher." -ForegroundColor Gray
+    Write-Host "  * Some module branchy code (e.g. file content detection) executes" -ForegroundColor Gray
+    Write-Host "    but is under-attributed. Treat the percentage as a lower bound." -ForegroundColor Gray
 } else {
-    Write-Host "Coverage target of 85% not yet achieved. Need $($totalFunctions - $totalCovered) more function tests." -ForegroundColor Yellow
+    Write-Host "  No coverage data returned by Pester." -ForegroundColor Yellow
 }
 
 # 返回结果
