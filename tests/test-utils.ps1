@@ -164,3 +164,33 @@ Describe "Format-Columns edge cases" {
         $result.Split([char]10).Count | Should BeGreaterThan 1
     }
 }
+
+Describe "Read-BashFileContent" {
+    BeforeAll {
+        $rfTestDir = Join-Path $env:TEMP ("rf-test-" + [guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Path $rfTestDir -Force | Out-Null
+        Set-Content -Path (Join-Path $rfTestDir "data.txt") -Value @("line1", "line2") -Encoding UTF8
+    }
+
+    AfterAll {
+        Remove-Item $rfTestDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Resolves relative path against PowerShell location, not .NET CWD" {
+        $orig = Get-Location
+        try {
+            Set-Location $rfTestDir
+            # .NET process CWD is unchanged, but PowerShell location is now the temp dir.
+            # Reading a relative path must still resolve to the temp-dir file.
+            $result = Read-BashFileContent "data.txt"
+            $result.Count | Should Be 2
+            $result[0] | Should Be "line1"
+        } finally {
+            Set-Location $orig
+        }
+    }
+
+    It "Returns null for non-existent file" {
+        (Read-BashFileContent (Join-Path $rfTestDir "nope.txt")) | Should Be $null
+    }
+}

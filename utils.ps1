@@ -49,5 +49,11 @@ function Read-BashFileContent {
     # Get-Content's behavior on Windows PowerShell 5.1, which decodes BOM-less
     # files as ANSI (GBK on Chinese systems) and garbles UTF-8 text.
     if (-not (Test-Path $Path)) { return $null }
-    return [System.IO.File]::ReadAllLines($Path)
+    # Resolve relative paths against PowerShell's location, NOT the .NET
+    # process CWD: File.ReadAllLines resolves relative paths against the
+    # process working directory (fixed at process start), which diverges from
+    # the PowerShell location after Set-Location/cd.
+    $fullPath = (Resolve-Path $Path -ErrorAction SilentlyContinue).ProviderPath
+    if (-not $fullPath) { $fullPath = $Path }
+    return [System.IO.File]::ReadAllLines($fullPath)
 }
