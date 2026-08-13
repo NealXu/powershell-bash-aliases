@@ -220,7 +220,7 @@ notepad $PROFILE
 删除以下内容：
 ```powershell
 # Bash-aliases module - remove conflicting aliases before import
-foreach ($a in @('ls','cat','rm','cp','mv','ps','kill','sort','ping','wget')) { Remove-Item Alias:$a -Force -ErrorAction SilentlyContinue }
+foreach ($a in @('cd','ls','cat','rm','cp','mv','ps','kill','sort','ping','wget','curl','echo','env','diff')) { Remove-Item Alias:$a -Force -ErrorAction SilentlyContinue }
 Import-Module bash-aliases -Force -ErrorAction SilentlyContinue
 ```
 
@@ -230,7 +230,10 @@ Import-Module bash-aliases -Force -ErrorAction SilentlyContinue
 
 ```
 powershell-bash-aliases/
-├── bash-aliases.psm1    # 模块入口
+├── bash-aliases.psd1    # 模块清单/入口（ScriptsToProcess 先运行 alias-cleanup.ps1）
+├── bash-aliases.psm1    # 模块主文件
+├── alias-cleanup.ps1    # 导入前清理内置别名（由 psd1 的 ScriptsToProcess 调用）
+├── profile-setup.ps1    # 安装时向 Profile 写入/去重 preamble 块
 ├── install.ps1          # 安装脚本
 ├── args-parser.ps1      # Bash 参数解析器
 ├── utils.ps1            # 工具函数

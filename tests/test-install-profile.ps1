@@ -97,4 +97,26 @@ Describe "Set-BashAliasesProfilePreamble" {
             Remove-Item $profile -Force -ErrorAction SilentlyContinue
         }
     }
+
+    It "preserves user lines when a preamble block is unterminated (no Import-Module terminator)" {
+        $content = @(
+            '# Bash-aliases module - remove conflicting aliases before import',
+            '# user line after a crashed/partial append',
+            'function keepme { ''x'' }'
+        )
+        $profile = New-TempProfile $content
+
+        Set-BashAliasesProfilePreamble -ProfilePath $profile
+
+        $after = @(Get-Content $profile)
+        # Every original line is still present - user data is NOT lost.
+        $after | Where-Object { $_ -eq '# user line after a crashed/partial append' } | Should Be '# user line after a crashed/partial append'
+        $after | Where-Object { $_ -match 'function keepme' } | Should Be 'function keepme { ''x'' }'
+        # The stale marker line is preserved along with the buffered lines.
+        $after | Where-Object { $_ -eq '# Bash-aliases module - remove conflicting aliases before import' } | Should Be '# Bash-aliases module - remove conflicting aliases before import'
+        # And the fresh preamble is still appended exactly once.
+        $importCount = @($after | Where-Object { $_ -match '^Import-Module bash-aliases' }).Count
+        $importCount | Should Be 1
+        Remove-Item $profile -Force -ErrorAction SilentlyContinue
+    }
 }

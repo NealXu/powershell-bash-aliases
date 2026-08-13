@@ -26,20 +26,38 @@ function Set-BashAliasesProfilePreamble {
     # '^# Bash-aliases module' and runs through the NEXT 'Import-Module
     # bash-aliases' line (inclusive). Old and duplicated blocks all share this
     # marker, so any number of stale copies are removed in one pass.
+    #
+    # Lines consumed inside a block are buffered. A block is only discarded when
+    # it is properly terminated by the Import-Module line; if EOF is reached
+    # while still inside a block (a partial/crashed append, or a user comment
+    # matching the marker), the buffered lines are re-emitted so no user data is
+    # silently dropped.
     $kept = [System.Collections.Generic.List[string]]::new()
     $inBlock = $false
+    $blockBuffer = [System.Collections.Generic.List[string]]::new()
     foreach ($line in $lines) {
         if ($inBlock) {
+            $blockBuffer.Add($line)
             if ($line -match 'Import-Module bash-aliases') {
                 $inBlock = $false
+                $blockBuffer.Clear()  # properly terminated -> discard the buffer
             }
             continue
         }
         if ($line -match '^# Bash-aliases module') {
             $inBlock = $true
+            $blockBuffer.Clear()
+            $blockBuffer.Add($line)
             continue
         }
         $kept.Add($line)
+    }
+
+    # Unterminated block at EOF: preserve every buffered line.
+    if ($inBlock) {
+        foreach ($bufLine in $blockBuffer) {
+            $kept.Add($bufLine)
+        }
     }
 
     # Append the single fresh preamble block.
