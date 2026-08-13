@@ -49,7 +49,7 @@ function grep {
             continue
         }
 
-        $content = Get-Content $fp
+        $content = Read-BashFileContent $fp
         $foundMatches = @()
         $lineNum = 1
 

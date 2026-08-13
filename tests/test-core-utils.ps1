@@ -139,8 +139,10 @@ Describe "seq" {
 
     It "Generates sequence to N" {
         $seqFunc = Get-Command seq -CommandType Function -ErrorAction SilentlyContinue
-        $result = & $seqFunc 5
-        $result.Count | Should BeGreaterThan 0
+        $result = @(& $seqFunc 5)
+        $result.Count | Should Be 5
+        $result[-1] | Should Be 5
+        $result[0] | Should Be 1
     }
 
     It "Uses custom separator" {

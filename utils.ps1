@@ -42,3 +42,12 @@ function Convert-BashPath {
     if ($Path.StartsWith('~')) { return $HOME + $Path.Substring(1) }
     return $Path
 }
+function Read-BashFileContent {
+    param([string]$Path)
+    # BOM-aware file reader. Uses .NET File.ReadAllLines, which detects a
+    # UTF-8/UTF-16 BOM and defaults to UTF-8 when there is no BOM. This avoids
+    # Get-Content's behavior on Windows PowerShell 5.1, which decodes BOM-less
+    # files as ANSI (GBK on Chinese systems) and garbles UTF-8 text.
+    if (-not (Test-Path $Path)) { return $null }
+    return [System.IO.File]::ReadAllLines($Path)
+}

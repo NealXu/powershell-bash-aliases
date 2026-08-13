@@ -125,7 +125,7 @@ function cat {
             Write-BashError -Command 'cat' -Message "cannot access '$fp'"
             continue
         }
-        Get-Content $fp | ForEach-Object {
+        Read-BashFileContent $fp | ForEach-Object {
             if ($showNumbers) {
                 Write-Output "$lineNum $_"
                 $lineNum++
@@ -556,8 +556,8 @@ function diff {
                 $f2 = "$file2$relPath"
 
                 if (Test-Path $f2) {
-                    $content1 = Get-Content $f1
-                    $content2 = Get-Content $f2
+                    $content1 = Read-BashFileContent $f1
+                    $content2 = Read-BashFileContent $f2
 
                     if (Compare-Object $content1 $content2) {
                         Write-Output "Files $f1 and $f2 differ"
@@ -573,8 +573,8 @@ function diff {
     }
 
     # Compare files
-    $content1 = Get-Content $file1
-    $content2 = Get-Content $file2
+    $content1 = Read-BashFileContent $file1
+    $content2 = Read-BashFileContent $file2
 
     $diff = Compare-Object $content1 $content2
 
@@ -798,7 +798,7 @@ function file {
                 } else {
                     # Try to detect text files
                     try {
-                        $content = Get-Content $filePath -First 1 -ErrorAction SilentlyContinue
+                        $content = Get-Content $filePath -Encoding UTF8 -TotalCount 1 -ErrorAction SilentlyContinue
                         if ($content) {
                             $fileType = if ($mime) { 'text/plain' } else { 'ASCII text' }
                         } else {

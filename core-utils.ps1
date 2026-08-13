@@ -303,7 +303,7 @@ function seq {
     $equalWidth = $parsed.Options['w'] -or $parsed.LongOptions['equal-width']
     $format = $parsed.Options['f']
 
-    $posArgs = $parsed.Positional | Where-Object { $_ -match '^-?\d+\.?\d*$' }
+    $posArgs = @($parsed.Positional | Where-Object { $_ -match '^-?\d+\.?\d*$' })
 
     $first = 1
     $incr = 1
@@ -458,7 +458,7 @@ function rev {
         foreach ($file in $script:files) {
             $path = Convert-BashPath $file
             if (Test-Path $path) {
-                $content = Get-Content $path
+                $content = Read-BashFileContent $path
                 & $processLines $content
             } else {
                 Write-BashError -Command 'rev' -Message "cannot open '$file'"
@@ -533,7 +533,7 @@ function shuf {
             foreach ($file in $script:files) {
                 $path = Convert-BashPath $file
                 if (Test-Path $path) {
-                    $lines += Get-Content $path
+                    $lines += Read-BashFileContent $path
                 } else {
                     Write-BashError -Command 'shuf' -Message "cannot open '$file'"
                 }

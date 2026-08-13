@@ -24,7 +24,7 @@ function head {
 
     if ($parsed.Positional.Count -gt 0) {
         $path = Convert-BashPath $parsed.Positional[0]
-        Get-Content $path | Select-Object -First ([int]$lines)
+        Read-BashFileContent $path | Select-Object -First ([int]$lines)
     }
 }
 function tail {
@@ -56,8 +56,8 @@ function tail {
 
     if ($parsed.Positional.Count -gt 0) {
         $path = Convert-BashPath $parsed.Positional[0]
-        if ($follow) { Get-Content $path -Wait }
-        else { Get-Content $path | Select-Object -Last ([int]$lines) }
+        if ($follow) { Get-Content $path -Wait -Encoding UTF8 }
+        else { Read-BashFileContent $path | Select-Object -Last ([int]$lines) }
     }
 }
 function wc {
@@ -92,7 +92,7 @@ function wc {
 
     foreach ($f in $parsed.Positional) {
         $fp = Convert-BashPath $f
-        $content = Get-Content $fp
+        $content = Read-BashFileContent $fp
         $lineCount = $content.Count
         $wordCount = ($content | ForEach-Object { $_.Split(' ') } | Measure-Object).Count
         $byteCount = ($content | Measure-Object -Property Length -Sum).Sum
@@ -139,7 +139,7 @@ function sort {
     $unique = $parsed.Options['u'] -or $parsed.LongOptions['unique']
 
     if ($parsed.Positional.Count -gt 0) {
-        $content = Get-Content (Convert-BashPath $parsed.Positional[0])
+        $content = Read-BashFileContent (Convert-BashPath $parsed.Positional[0])
     } else {
         $content = $input
     }
@@ -224,7 +224,7 @@ function cut {
     $fieldList = $fields.Split(',')
 
     if ($parsed.Positional.Count -gt 0) {
-        $content = Get-Content (Convert-BashPath $parsed.Positional[0])
+        $content = Read-BashFileContent (Convert-BashPath $parsed.Positional[0])
     } else {
         $content = $input
     }
@@ -340,7 +340,7 @@ function sed {
         return
     }
 
-    $content = Get-Content $filePath
+    $content = Read-BashFileContent $filePath
     $result = @()
 
     # Parse sed command (basic support for s/pattern/replacement/[flags])
@@ -442,7 +442,7 @@ function awk {
         foreach ($f in $files) {
             $filePath = Convert-BashPath $f
             if (Test-Path $filePath) {
-                $content += Get-Content $filePath
+                $content += Read-BashFileContent $filePath
             } else {
                 Write-BashError -Command 'awk' -Message "cannot access '$filePath'"
             }
@@ -567,12 +567,12 @@ function patch {
             Write-BashError -Command 'patch' -Message "cannot access patch file '$patchPath'"
             return
         }
-        $patchContent = Get-Content $patchPath
+        $patchContent = Read-BashFileContent $patchPath
     } elseif ($parsed.Positional.Count -gt 0) {
         # First positional is patch file
         $patchPath = Convert-BashPath $parsed.Positional[0]
         if (Test-Path $patchPath) {
-            $patchContent = Get-Content $patchPath
+            $patchContent = Read-BashFileContent $patchPath
         } else {
             Write-BashError -Command 'patch' -Message "cannot access '$patchPath'"
             return
@@ -650,7 +650,7 @@ function patch {
         return
     }
 
-    $fileContent = Get-Content $targetPath
+    $fileContent = Read-BashFileContent $targetPath
 
     if ($dryRun) {
         Write-Output "Dry run: would patch $targetFile"

@@ -22,7 +22,7 @@ function less {
     if ($paths.Count -eq 0) {
         $content = $input
     } else {
-        $content = Get-Content (Convert-BashPath $paths[0])
+        $content = Read-BashFileContent (Convert-BashPath $paths[0])
     }
     $content | Out-Host -Paging
 }
@@ -62,7 +62,7 @@ function more {
         foreach ($file in $parsed.Positional) {
             $filePath = Convert-BashPath $file
             if (Test-Path $filePath) {
-                $content += Get-Content $filePath
+                $content += Read-BashFileContent $filePath
             } else {
                 Write-BashError -Command 'more' -Message "cannot access '$filePath'"
             }
