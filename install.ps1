@@ -16,7 +16,9 @@ param(
     # 可选:手动指定安装路径。不提供时自动识别本机已安装的 shell 类型再部署。
     [string[]]$InstallPaths,
     [switch]$AddToProfile,
-    [switch]$Force
+    [switch]$Force,
+    # 可选:指定写入 bash-aliases preamble 的 Profile 路径(默认 $PROFILE)。便于测试/自定义。
+    [string]$ProfilePath = $PROFILE
 )
 
 $ErrorActionPreference = 'Stop'
@@ -69,7 +71,7 @@ foreach ($InstallPath in $InstallPaths) {
 
 if ($AddToProfile) {
     . (Join-Path $sourceDir 'profile-setup.ps1')
-    Set-BashAliasesProfilePreamble -ProfilePath $PROFILE
+    Set-BashAliasesProfilePreamble -ProfilePath $ProfilePath
     Write-Output "Added bash-aliases preamble to profile"
 }
 

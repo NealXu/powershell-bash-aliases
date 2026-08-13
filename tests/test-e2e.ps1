@@ -106,6 +106,25 @@ Describe "e2e: installed command smoke" {
     }
 }
 
+Describe "e2e: install -AddToProfile writes an idempotent preamble" {
+    It "writes exactly one preamble block to the profile and is idempotent" {
+        $tmpProfile = Join-Path $env:TEMP ('e2e-profile-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        $tmpInstall = Join-Path $env:TEMP ('e2e-install-pro-' + [guid]::NewGuid().ToString('N'))
+        try {
+            # First call creates the preamble; a second call must not duplicate it.
+            $null = & (Join-Path $scriptDir '..\install.ps1') -InstallPaths $tmpInstall -AddToProfile -ProfilePath $tmpProfile
+            $null = & (Join-Path $scriptDir '..\install.ps1') -InstallPaths $tmpInstall -AddToProfile -ProfilePath $tmpProfile
+
+            $content = @(Get-Content $tmpProfile)
+            @($content | Where-Object { $_ -match '^Import-Module bash-aliases' }).Count | Should Be 1
+            @($content | Where-Object { $_ -match '^# Bash-aliases module' }).Count | Should Be 1
+        } finally {
+            Remove-Item $tmpProfile -Force -ErrorAction SilentlyContinue
+            Remove-Item $tmpInstall -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # --- Teardown: remove the temp install and unload the installed module copy ---
 # Must also Remove-Module the INSTALLED instance: leaving a second 'bash-aliases'
 # script module loaded breaks Pester 3.4 InModuleScope/Mock in later test files
