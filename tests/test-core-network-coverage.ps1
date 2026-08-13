@@ -57,9 +57,14 @@ Describe "curl branch coverage" {
     It "curl --output downloads to a custom file" {
         Mock Invoke-WebRequest { param($Url, $OutFile) return [pscustomobject]@{ Content = "saved:$OutFile" } } -ModuleName bash-aliases
         $null = & $script:curlFunc --output 'out.txt' 'http://example.com/file.txt'
-        # NOTE: core-network.ps1 computes $outputFile with -or, so the value is a
-        # boolean here; the branch is still the -OutFile one.
-        Assert-MockCalled Invoke-WebRequest -ModuleName bash-aliases -Times 1 -ParameterFilter { $OutFile }
+        # The fixed code resolves $outputFile to the string 'out.txt', not a boolean.
+        Assert-MockCalled Invoke-WebRequest -ModuleName bash-aliases -Times 1 -ParameterFilter { $OutFile -is [string] -and $OutFile -eq 'out.txt' }
+    }
+
+    It "curl -o FILE passes the string path as OutFile" {
+        Mock Invoke-WebRequest { param($Url, $OutFile) return [pscustomobject]@{ Content = "saved:$OutFile" } } -ModuleName bash-aliases
+        $null = & $script:curlFunc -o 'out.txt' 'http://example.com/file.txt'
+        Assert-MockCalled Invoke-WebRequest -ModuleName bash-aliases -Times 1 -ParameterFilter { $OutFile -is [string] -and $OutFile -eq 'out.txt' }
     }
 
     It "curl --output=FILE (equals syntax) downloads to a custom file" {

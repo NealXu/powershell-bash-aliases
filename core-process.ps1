@@ -134,7 +134,8 @@ function top {
     Write-Output "PID    ProcessName       CPU    Memory"
     foreach ($p in $procs) {
         $mem = Format-FileSize $p.WorkingSet -HumanReadable
-        Write-Output "$($p.Id.ToString().PadLeft(6)) $($p.ProcessName.PadRight(16)) $($p.CPU.ToString('N1').PadLeft(6))  $mem"
+        $cpu = if ($p.CPU) { $p.CPU.ToString('N1') } else { '0.0' }
+        Write-Output "$($p.Id.ToString().PadLeft(6)) $($p.ProcessName.PadRight(16)) $($cpu.PadLeft(6))  $mem"
     }
 }
 
@@ -248,7 +249,7 @@ function bg {
 
     # Resume job in background
     if ($job -and $job.PSObject.Properties['State']) {
-        Receive-Job -Job $job -Force -ErrorAction SilentlyContinue
+        Receive-Job -Job $job -ErrorAction SilentlyContinue
         Write-Output "Background job resumed"
     } else {
         Write-BashError -Command 'bg' -Message 'job not found'

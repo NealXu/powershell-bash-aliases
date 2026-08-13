@@ -22,6 +22,8 @@ $script:bgFunc = Get-Command bg -CommandType Function -ErrorAction SilentlyConti
 $script:fgFunc = Get-Command fg -CommandType Function -ErrorAction SilentlyContinue
 $script:nohupFunc = Get-Command nohup -CommandType Function -ErrorAction SilentlyContinue
 
+$script:module = Get-Module bash-aliases
+
 Describe "ps" {
     It "Lists processes" {
         $result = & $script:psFunc
@@ -103,6 +105,22 @@ Describe "top" {
     It "Uses default n equals 10" {
         $result = & $script:topFunc --help
         $result | Should Not Be $null
+    }
+
+    It "Handles a process with null CPU without throwing" {
+        $result = InModuleScope bash-aliases {
+            Mock Get-Process {
+                @([pscustomobject]@{
+                    Id = 1
+                    ProcessName = 'MemoryCompression'
+                    CPU = $null
+                    WorkingSet = [long]1024
+                })
+            }
+            @(top -n 1 2>$null)
+        }
+        $result.Count | Should Be 2
+        $result[1] -match '0.0' | Should Be $true
     }
 }
 
@@ -189,6 +207,17 @@ Describe "bg" {
     It "Errors when no job" {
         $result = & $script:bgFunc 2>&1
         $result -match "invalid job ID" | Should Be $true
+    }
+
+    It "Resumes an existing background job without throwing" {
+        $job = Start-Job -ScriptBlock { Start-Sleep -Seconds 30 }
+        try {
+            & $script:module { param($j) $script:JobTable = @{ 'j1' = $j } } $job
+            { & $script:bgFunc 1 } | Should Not Throw
+        } finally {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 

@@ -25,7 +25,7 @@ function curl {
     }
 
     $saveRemoteName = $parsed.Options['remote_name'] -or $parsed.LongOptions['remote-name']
-    $outputFile = $parsed.Options['output'] -or $parsed.LongOptions['output']
+    $outputFile = if ($parsed.Options['output']) { $parsed.Options['output'] } else { $parsed.LongOptions['output'] }
     $headOnly = $parsed.Options['I'] -or $parsed.LongOptions['head']
 
     if ($parsed.Positional.Count -eq 0) {

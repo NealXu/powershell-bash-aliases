@@ -1,9 +1,9 @@
 function head {
     param(
-        [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$help
     )
 
+    $ArgList = @($args)
     $allArgs = @()
     if ($help) { $allArgs += '-help' }
     $allArgs += $ArgList
@@ -151,10 +151,10 @@ function sort {
 }
 function uniq {
     param(
-        [switch]$c, [switch]$d, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$c, [switch]$d, [switch]$help
     )
 
+    $ArgList = @($args)
     $allArgs = @()
     if ($c) { $allArgs += '-c' }
     if ($d) { $allArgs += '-d' }
@@ -189,10 +189,10 @@ function uniq {
 }
 function cut {
     param(
-        [switch]$d, [switch]$f, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$d, [switch]$f, [switch]$help
     )
 
+    $ArgList = @($args)
     $spec = @{
         'd' = @{ Long = 'delimiter'; Type = 'value'; DefaultValue = ' ' }
         'f' = @{ Long = 'fields'; Type = 'value' }
@@ -202,8 +202,8 @@ function cut {
     # Pair value switches with values from ArgList
     $remaining = @($ArgList)
     $allArgs = @()
-    if ($d) { $allArgs += '-d'; if ($remaining.Count -gt 0) { $allArgs += $remaining[0]; $remaining = $remaining[1..($remaining.Count-1)] } }
-    if ($f) { $allArgs += '-f'; if ($remaining.Count -gt 0) { $allArgs += $remaining[0]; $remaining = $remaining[1..($remaining.Count-1)] } }
+    if ($d) { $allArgs += '-d'; if ($remaining.Count -gt 0) { $allArgs += $remaining[0]; $remaining = @($remaining | Select-Object -Skip 1) } }
+    if ($f) { $allArgs += '-f'; if ($remaining.Count -gt 0) { $allArgs += $remaining[0]; $remaining = @($remaining | Select-Object -Skip 1) } }
     if ($help) { $allArgs += '-help' }
     $allArgs += $remaining
 
@@ -241,10 +241,10 @@ function cut {
 }
 function tr {
     param(
-        [switch]$d, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$d, [switch]$help
     )
 
+    $ArgList = @($args)
     $allArgs = @()
     if ($d) { $allArgs += '-d' }
     if ($help) { $allArgs += '-help' }
@@ -388,10 +388,10 @@ function sed {
 
 function awk {
     param(
-        [switch]$F, [switch]$v, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$F, [switch]$v, [switch]$help
     )
 
+    $ArgList = @($args)
     $allArgs = @()
     if ($F) { $allArgs += '-F' }
     if ($v) { $allArgs += '-v' }
@@ -424,7 +424,7 @@ function awk {
         # If it contains { or looks like a pattern-action, it's the program
         if ($firstArg -match '[\{\}]' -or $firstArg -match '^\$' -or $firstArg -match 'BEGIN|END|print') {
             $program = $firstArg
-            $files = $parsed.Positional[1..($parsed.Positional.Count - 1)]
+            $files = @($parsed.Positional | Select-Object -Skip 1)
         } else {
             # It's a file, program was passed via -f
             $files = $parsed.Positional
@@ -439,8 +439,8 @@ function awk {
     # If no files, read from pipeline/input
     $content = @()
     if ($files.Count -gt 0) {
-        foreach ($f in $files) {
-            $filePath = Convert-BashPath $f
+        foreach ($file in $files) {
+            $filePath = Convert-BashPath $file
             if (Test-Path $filePath) {
                 $content += Read-BashFileContent $filePath
             } else {
@@ -530,12 +530,13 @@ function patch {
         [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
+    $remaining = @($ArgList)
     $allArgs = @()
-    if ($p) { $allArgs += '-p' }
+    if ($p) { $allArgs += '-p'; if ($remaining.Count -gt 0) { $allArgs += $remaining[0]; $remaining = @($remaining | Select-Object -Skip 1) } }
     if ($R) { $allArgs += '-R' }
     if ($dry_run) { $allArgs += '--dry-run' }
     if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
+    $allArgs += $remaining
 
     $spec = @{
         'p' = @{ Long = 'strip'; Type = 'value'; DefaultValue = '0' }

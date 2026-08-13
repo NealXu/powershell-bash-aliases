@@ -5,6 +5,9 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "..\args-parser.ps1")
 . (Join-Path $scriptDir "..\core-view.ps1")
 
+$script:lessFunc = Get-Command less -CommandType Function -ErrorAction SilentlyContinue
+$script:moreFunc = Get-Command more -CommandType Function -ErrorAction SilentlyContinue
+
 Describe "less" {
     BeforeAll {
         $testFile = "test-less.txt"
@@ -39,10 +42,9 @@ Describe "less" {
         { less -Path "nonexistent-file.txt" } | Should Throw
     }
 
-    It "Accepts pipeline input" -Skip {
-        # 管道输入测试
-        $content = "test line 1", "test line 2"
-        { $content | less } | Should Not Throw
+    It "Accepts pipeline input" {
+        # 管道输入测试: less 是简单函数,管道输入不再被高级参数绑定拦截
+        { "test line 1", "test line 2" | & $script:lessFunc } | Should Not Throw
     }
 
     It "Returns content from Get-Content" {
@@ -87,5 +89,12 @@ Describe "more" {
     It "Uses Out-Host -Paging for display" {
         $code = Get-Content (Join-Path $scriptDir "..\core-view.ps1") -Raw
         $code -match "Out-Host.*-Paging" | Should Be $true
+    }
+}
+
+Describe "more pipeline (regression)" {
+    It "Accepts pipeline input without throwing" {
+        # 管道输入测试: more 是简单函数,管道输入不再被高级参数绑定拦截
+        { "line1", "line2" | & $script:moreFunc } | Should Not Throw
     }
 }

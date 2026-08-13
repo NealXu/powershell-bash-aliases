@@ -44,6 +44,12 @@ Describe "curl" {
         # 需要验证错误处理
         { curl -Url "http://invalid-host-xyz" } | Should Not Throw
     }
+
+    It "Passes the -o FILE path (not a boolean) as OutFile" {
+        Mock Invoke-WebRequest { param($Url, $OutFile) return [pscustomobject]@{ Content = "saved:$OutFile" } } -ModuleName bash-aliases
+        $null = & $script:curlFunc -o 'out.txt' 'http://example.com/file.txt'
+        Assert-MockCalled Invoke-WebRequest -ModuleName bash-aliases -Times 1 -ParameterFilter { $OutFile -is [string] -and $OutFile -eq 'out.txt' }
+    }
 }
 
 Describe "ping" {

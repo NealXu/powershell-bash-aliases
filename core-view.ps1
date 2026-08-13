@@ -1,8 +1,9 @@
 function less {
     param(
-        [switch]$Help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$Help
     )
+
+    $ArgList = @($args)
 
     $allArgs = @()
     if ($Help) { $allArgs += '-help' }
@@ -29,9 +30,10 @@ function less {
 
 function more {
     param(
-        [switch]$d, [switch]$f, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$d, [switch]$f, [switch]$help
     )
+
+    $ArgList = @($args)
 
     $allArgs = @()
     if ($d) { $allArgs += '-d' }

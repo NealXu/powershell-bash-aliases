@@ -44,16 +44,14 @@ function echo {
 }
 
 function tee {
-    [CmdletBinding()]
     param(
-        [switch]$a,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$a
     )
 
     begin {
         $allArgs = @()
         if ($a) { $allArgs += '-a' }
-        $allArgs += $ArgList
+        $allArgs += $args
 
         $spec = @{
             'a' = @{ Long = 'append'; Type = 'switch' }
@@ -73,7 +71,10 @@ function tee {
 
     process {
         # Collect all input
-        $script:output += $Input
+        $items = @($input)
+        if ($items.Count -gt 0) {
+            $script:output += $items
+        }
     }
 
     end {
@@ -279,12 +280,26 @@ function seq {
         [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
     )
 
+    # Parse-BashArgs treats bare '-N' tokens as flags and drops them,
+    # so `seq 5 -1 1` loses the '-1'. Mask negative numbers before
+    # parsing and restore them afterward.
+    $negValues = @()
+    $maskedArgs = @()
+    foreach ($arg in $ArgList) {
+        if ($arg -match '^-\d+(\.\d+)?$') {
+            $maskedArgs += "SEQNEG$($negValues.Count)"
+            $negValues += $arg
+        } else {
+            $maskedArgs += $arg
+        }
+    }
+
     $allArgs = @()
     if ($s) { $allArgs += '-s' }
     if ($w) { $allArgs += '-w' }
     if ($f) { $allArgs += '-f' }
     if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
+    $allArgs += $maskedArgs
 
     $spec = @{
         's' = @{ Long = 'separator'; Type = 'value' }
@@ -303,7 +318,15 @@ function seq {
     $equalWidth = $parsed.Options['w'] -or $parsed.LongOptions['equal-width']
     $format = $parsed.Options['f']
 
-    $posArgs = @($parsed.Positional | Where-Object { $_ -match '^-?\d+\.?\d*$' })
+    # Restore masked negative numbers into the positional list.
+    $restored = @($parsed.Positional | ForEach-Object {
+        if ($_ -match '^SEQNEG(\d+)$') {
+            $negValues[[int]$matches[1]]
+        } else {
+            $_
+        }
+    })
+    $posArgs = @($restored | Where-Object { $_ -match '^-?\d+\.?\d*$' })
 
     $first = 1
     $incr = 1
@@ -410,10 +433,8 @@ function yes {
 }
 
 function rev {
-    [CmdletBinding()]
     param(
-        [switch]$help,
-        [Parameter(ValueFromPipeline=$true, ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$help
     )
 
     begin {
@@ -428,14 +449,10 @@ function rev {
             return
         }
 
-        if ($ArgList) {
-            foreach ($item in $ArgList) {
-                if (Test-Path $item) {
-                    $script:files += $item
-                } else {
-                    $script:collectedInput += $item
-                }
-            }
+        # Pipeline data goes straight to collectedInput; it is never a file path.
+        $items = @($input)
+        if ($items.Count -gt 0) {
+            $script:collectedInput += $items
         }
     }
 
@@ -443,6 +460,17 @@ function rev {
         if ($script:showHelp) {
             Write-Output 'Usage: rev [FILE]... [--help]'
             return
+        }
+
+        # Positional args are files; --help lands here (not on the -help switch).
+        if ($args) {
+            foreach ($item in $args) {
+                if ($item -eq '--help' -or $item -eq '-help') {
+                    Write-Output 'Usage: rev [FILE]... [--help]'
+                    return
+                }
+                $script:files += $item
+            }
         }
 
         $processLines = {
@@ -580,12 +608,10 @@ function shuf {
 }
 
 function xargs {
-    [CmdletBinding()]
     param(
         [switch]$n,
         [switch]$r,
-        [switch]$help,
-        [Parameter(ValueFromPipeline=$true, ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$help
     )
 
     begin {
@@ -596,11 +622,14 @@ function xargs {
         $script:collectedInput = @()
         $script:showHelp = $false
         $script:parsedArgs = @()
+        if ($args) { $script:parsedArgs = @($args) }
     }
 
     process {
-        if ($ArgList) {
-            $script:parsedArgs += $ArgList
+        # Pipeline data is NOT a command argument; it is the input to batch.
+        $items = @($input)
+        if ($items.Count -gt 0) {
+            $script:collectedInput += $items
         }
     }
 

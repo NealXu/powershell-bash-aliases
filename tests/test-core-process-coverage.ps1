@@ -128,12 +128,13 @@ Describe "bg" {
         $result[0].ToString() -match 'invalid job ID: abc' | Should Be $true
     }
 
-    It "Reaches the resume path for an existing job" {
+    It "Resumes an existing job without throwing" {
         $job = Start-Job -ScriptBlock { Start-Sleep -Seconds 30 }
         Set-JobTable @{ 'j1' = $job }
-        # The module's bg calls Receive-Job -Force without -Wait, which always
-        # throws a parameter-binding error, so the resume path is expected to throw.
-        { & $script:bgFunc 1 } | Should Throw
+        # bg must not throw. Receive-Job without -Wait on a running job returns
+        # the output available so far (none) and does not error.
+        { & $script:bgFunc 1 } | Should Not Throw
+        (& $script:module { $script:JobTable.Count }) | Should Be 1
     }
 }
 
@@ -233,6 +234,26 @@ Describe "top" {
             @(top -n 5 2>$null)
         }
         $result.Count | Should Be 6
+    }
+
+    It "Handles a process with null CPU without throwing" {
+        # Some processes (e.g. Memory Compression) report a $null CPU; top must
+        # not crash calling .ToString('N1') on it and should render 0.0 instead.
+        $result = InModuleScope bash-aliases {
+            Mock Get-Process {
+                @([pscustomobject]@{
+                    Id = 999
+                    ProcessName = 'MemoryCompression'
+                    CPU = $null
+                    WorkingSet = [long]1024
+                })
+            }
+            @(top -n 1 2>$null)
+        }
+        $result.Count | Should Be 2
+        $result[0] -match '^PID' | Should Be $true
+        ($result -join "`n") -match 'MemoryCompression' | Should Be $true
+        $result[1] -match '0.0' | Should Be $true
     }
 }
 
