@@ -45,6 +45,10 @@ $coreFiles = @(
 # 需要重新带覆盖率跑一遍（上面第 25 行已跑过一次无覆盖的，为拿覆盖率结果再跑一次）
 $covResult = Invoke-Pester -Path ($testScripts | ForEach-Object { $_.FullName }) -CodeCoverage $coreFiles -PassThru
 
+if ($covResult.FailedCount -gt 0) {
+    Write-Host "WARNING: $($covResult.FailedCount) test(s) failed during the coverage run (run 2)." -ForegroundColor Red
+}
+
 $cc = $covResult.CodeCoverage
 if ($cc) {
     $executed = $cc.NumberOfCommandsExecuted
