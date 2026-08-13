@@ -21,7 +21,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $sourceDir = $PSScriptRoot
-$files = @('bash-aliases.psm1', 'args-parser.ps1', 'utils.ps1', 'core-file.ps1', 'core-text.ps1', 'core-search.ps1', 'core-process.ps1', 'core-network.ps1', 'core-view.ps1', 'core-system.ps1', 'core-utils.ps1', 'core-compress.ps1', 'core-edit.ps1')
+$files = @('bash-aliases.psm1', 'args-parser.ps1', 'utils.ps1', 'core-file.ps1', 'core-text.ps1', 'core-search.ps1', 'core-process.ps1', 'core-network.ps1', 'core-view.ps1', 'core-system.ps1', 'core-utils.ps1', 'core-compress.ps1', 'core-edit.ps1', 'bash-aliases.psd1', 'alias-cleanup.ps1', 'profile-setup.ps1')
 
 # --- 自动识别本机安装的 PowerShell 类型,决定部署目标 ---
 # 每个 PowerShell 版本在 Documents 下使用自己的模块目录,互不共享:
@@ -68,15 +68,9 @@ foreach ($InstallPath in $InstallPaths) {
 }
 
 if ($AddToProfile) {
-    $line = @"
-# Bash-aliases module - remove conflicting aliases before import
-foreach (`$a in @('cd','ls','cat','rm','cp','mv','ps','kill','sort','ping','wget','curl','echo','env','diff')) { Remove-Item Alias:`$a -Force -ErrorAction SilentlyContinue }
-Import-Module bash-aliases -Force -ErrorAction SilentlyContinue
-"@
-    if (-not (Test-Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force | Out-Null }
-    if ((Get-Content $PROFILE -ErrorAction SilentlyContinue) -notcontains 'Import-Module bash-aliases') {
-        Add-Content $PROFILE $line; Write-Output "Added to profile"
-    }
+    . (Join-Path $sourceDir 'profile-setup.ps1')
+    Set-BashAliasesProfilePreamble -ProfilePath $PROFILE
+    Write-Output "Added bash-aliases preamble to profile"
 }
 
 Write-Output "Installation complete at: $InstallPath"
