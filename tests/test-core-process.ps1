@@ -205,8 +205,9 @@ Describe "bg" {
     }
 
     It "Errors when no job" {
+        & $script:module { param() $script:JobTable = @{} }
         $result = & $script:bgFunc 2>&1
-        $result -match "invalid job ID" | Should Be $true
+        $result -match "no current job" | Should Be $true
     }
 
     It "Resumes an existing background job without throwing" {
@@ -228,8 +229,9 @@ Describe "fg" {
     }
 
     It "Errors when no job" {
+        & $script:module { param() $script:JobTable = @{} }
         $result = & $script:fgFunc 2>&1
-        $result -match "invalid job ID" | Should Be $true
+        $result -match "no current job" | Should Be $true
     }
 }
 

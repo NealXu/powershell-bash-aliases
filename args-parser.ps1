@@ -152,7 +152,12 @@ function Parse-BashArgs {
             $i++
         }
         else {
-            $result.Positional += $arg
+            # Skip empty/whitespace args: `@() + $null` yields a $null element in PS 5.1,
+            # which [string[]] coercion turns into '', so a no-arg call would otherwise
+            # produce an empty positional that breaks bare `ls` (it silently skips '').
+            if (-not [string]::IsNullOrWhiteSpace($arg)) {
+                $result.Positional += $arg
+            }
             $i++
         }
     }

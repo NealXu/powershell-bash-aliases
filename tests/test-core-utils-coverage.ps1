@@ -299,7 +299,7 @@ Describe "time" {
     }
 
     It "reports a failed command" {
-        $out = @(& $script:timeFunc 2>&1)
+        $out = @(& $script:timeFunc 'definitely-not-a-command-xyz' 2>&1)
         ($out -join ' ') | Should Match "failed to execute"
     }
 }
