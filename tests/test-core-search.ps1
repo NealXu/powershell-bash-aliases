@@ -84,7 +84,7 @@ Describe "grep parameter tests" {
     BeforeAll {
         $testFile1 = "test-grep-multi1.txt"
         $testFile2 = "test-grep-multi2.txt"
-        Set-Content -Path $testFile1 -Value "hello world", "test line" -Encoding UTF8
+        Set-Content -Path $testFile1 -Value "hello world", "test line", "HELLO again" -Encoding UTF8
         Set-Content -Path $testFile2 -Value "hello again" -Encoding UTF8
     }
     AfterAll {
@@ -102,6 +102,22 @@ Describe "grep parameter tests" {
     It "Returns empty for no match" {
         $result = grep 'xyz123' $testFile1
         $result | Should Be $null
+    }
+    It "Inverts matches with -v" {
+        $result = grep -v 'hello' $testFile1
+        @($result).Count | Should Be 2
+        (@($result) -join '|') -match 'test line' | Should Be $true
+    }
+
+    It "Combines -i and -v for case-insensitive invert" {
+        $result = grep -i -v 'hello' $testFile1
+        @($result).Count | Should Be 1
+        (@($result) -join '|') -match 'test line' | Should Be $true
+    }
+
+    It "Reports an error when no pattern is given" {
+        $out = @(grep -ArgList @() 2>&1)
+        @($out | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }).Count | Should Be 1
     }
 }
 
