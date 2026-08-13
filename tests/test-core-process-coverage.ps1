@@ -101,6 +101,11 @@ Describe "jobs" {
 }
 
 Describe "bg" {
+    # One Start-Job serves both resume tests: bg never consumes the job (it only
+    # calls non-blocking Receive-Job), so re-adding the same job per test is safe.
+    # Short sleep so the job process exits quickly instead of lingering 30 s.
+    BeforeAll { $script:sharedBgJob = Start-Job -ScriptBlock { Start-Sleep -Milliseconds 200 } }
+    AfterAll  { Remove-Job $script:sharedBgJob -Force -ErrorAction SilentlyContinue }
     BeforeEach { Reset-JobTable }
 
     It "Shows help usage" {
@@ -129,8 +134,7 @@ Describe "bg" {
     }
 
     It "Resumes an existing job without throwing" {
-        $job = Start-Job -ScriptBlock { Start-Sleep -Seconds 30 }
-        Set-JobTable @{ 'j1' = $job }
+        Set-JobTable @{ 'j1' = $script:sharedBgJob }
         # bg must not throw. Receive-Job without -Wait on a running job returns
         # the output available so far (none) and does not error.
         { & $script:bgFunc 1 } | Should Not Throw
@@ -138,8 +142,7 @@ Describe "bg" {
     }
 
     It "Resumes the most recent job when no id is given" {
-        $job = Start-Job -ScriptBlock { Start-Sleep -Seconds 30 }
-        Set-JobTable @{ 'j1' = $job }
+        Set-JobTable @{ 'j1' = $script:sharedBgJob }
         # -ArgList @() is required: invoking a Get-Command function reference with
         # no arguments on PowerShell 5.1 binds a phantom empty string into the
         # ValueFromRemainingArguments param, which would hit the "invalid job ID"
@@ -179,7 +182,9 @@ Describe "fg" {
     }
 
     It "Brings a job to the foreground and removes it" {
-        $job = Start-Job -ScriptBlock { Start-Sleep -Milliseconds 300; Write-Output 'fg-done' }
+        # No sleep needed: Start-Job's process boot (~1.7 s) keeps the job 'Running'
+        # when fg is called immediately after; the sleep only added pure wait time.
+        $job = Start-Job -ScriptBlock { Write-Output 'fg-done' }
         Set-JobTable @{ 'j1' = $job }
         $result = @(& $script:fgFunc 1 2>&1)
         ($result -join "`n") -match 'Bringing job to foreground' | Should Be $true
@@ -187,7 +192,9 @@ Describe "fg" {
     }
 
     It "Brings the most recent job to the foreground when no id is given" {
-        $job = Start-Job -ScriptBlock { Start-Sleep -Milliseconds 300; Write-Output 'fg-done' }
+        # No sleep needed: Start-Job's process boot (~1.7 s) keeps the job 'Running'
+        # when fg is called immediately after; the sleep only added pure wait time.
+        $job = Start-Job -ScriptBlock { Write-Output 'fg-done' }
         Set-JobTable @{ 'j1' = $job }
         # -ArgList @() required: see the bg "most recent job" test for the
         # PowerShell 5.1 phantom empty-argument quirk explanation.
@@ -327,12 +334,16 @@ Describe "nohup" {
             $r = @(& $script:nohupFunc Write-Output 'hello-nohup' 2>&1)
             ($r -join "`n") -match 'Started background job' | Should Be $true
             # The event action runs async: poll for nohup.out to be flushed.
+            # Poll for the MARKER inside nohup.out, not just the file: the *>>
+            # redirection creates the file before the child's output is flushed,
+            # so Test-Path alone races an empty file (flaked under load).
             $deadline = (Get-Date).AddSeconds(15)
-            while (-not (Test-Path $nohupOut) -and (Get-Date) -lt $deadline) {
-                Start-Sleep -Milliseconds 250
+            $content = ''
+            while ($content -notmatch 'hello-nohup' -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 100
+                if (Test-Path $nohupOut) { $content = Get-Content $nohupOut -Raw }
             }
-            Test-Path $nohupOut | Should Be $true
-            (Get-Content $nohupOut -Raw) -match 'hello-nohup' | Should Be $true
+            $content | Should Match 'hello-nohup'
         } finally {
             Pop-Location
             Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
