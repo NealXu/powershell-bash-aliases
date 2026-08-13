@@ -269,10 +269,10 @@ Invoke-Pester tests\test-e2e.ps1
 > run-tests.ps1 会自动收集 test-e2e.ps1。e2e 只操作 `$env:TEMP` 下的临时目录，不会触碰真实安装目录或 Profile。
 
 ```powershell
-# 在独立终端运行全量套件（避免在 Claude Code CLI 中阻塞/进度条驻留）：
+# 在后台无窗口运行全量套件（避免在 Claude Code CLI 中阻塞/进度条驻留）：
 .\run-tests-detached.ps1
 
-# 该命令会新开一个 PowerShell 窗口并在其中运行 run-tests.ps1，立即返回；
+# 该命令会在后台（headless，不弹窗）运行 run-tests.ps1 并立即返回，完成后进程自行退出；
 # 完整输出（Start-Transcript）会写入 %TEMP%\bash-aliases-tests-<时间戳>.log。
 ```
 
