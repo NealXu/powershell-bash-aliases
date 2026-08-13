@@ -93,8 +93,6 @@ Describe "e2e: installed command smoke" {
             # Poll for the MARKER inside nohup.out, not just the file: the *>>
             # redirection creates the file before the child's output is flushed,
             # so Test-Path alone races an empty file (flaked under load).
-            # The [string] cast keeps an empty read (PS 5.1 returns a null whose
-            # -notmatch is falsy) from exiting the poll before output lands.
             $deadline = (Get-Date).AddSeconds(15)
             $content = ''
             while ($content -notmatch 'e2e-nohup-marker' -and (Get-Date) -lt $deadline) {
