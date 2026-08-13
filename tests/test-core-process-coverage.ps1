@@ -336,12 +336,15 @@ Describe "nohup" {
             # The event action runs async: poll for nohup.out to be flushed.
             # Poll for the MARKER inside nohup.out, not just the file: the *>>
             # redirection creates the file before the child's output is flushed,
-            # so Test-Path alone races an empty file (flaked under load).
+            # so Test-Path alone races an empty file (flaked under load). The loop
+            # condition is time-based ONLY so a falsy read can never exit early;
+            # a locked/empty read is swallowed (catch -> continue) and retried.
             $deadline = (Get-Date).AddSeconds(15)
-            $content = ''
-            while ($content -notmatch 'hello-nohup' -and (Get-Date) -lt $deadline) {
+            $content = $null
+            while ((Get-Date) -lt $deadline) {
                 Start-Sleep -Milliseconds 100
-                if (Test-Path $nohupOut) { $content = Get-Content $nohupOut -Raw }
+                try { $content = Get-Content $nohupOut -Raw -ErrorAction Stop } catch { continue }
+                if ($content -match 'hello-nohup') { break }
             }
             $content | Should Match 'hello-nohup'
         } finally {

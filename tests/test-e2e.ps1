@@ -92,12 +92,15 @@ Describe "e2e: installed command smoke" {
             ($r -join "`n") -match 'Started background job' | Should Be $true
             # Poll for the MARKER inside nohup.out, not just the file: the *>>
             # redirection creates the file before the child's output is flushed,
-            # so Test-Path alone races an empty file (flaked under load).
+            # so Test-Path alone races an empty file (flaked under load). The loop
+            # condition is time-based ONLY so a falsy read can never exit early;
+            # a locked/empty read is swallowed (catch -> continue) and retried.
             $deadline = (Get-Date).AddSeconds(15)
-            $content = ''
-            while ($content -notmatch 'e2e-nohup-marker' -and (Get-Date) -lt $deadline) {
+            $content = $null
+            while ((Get-Date) -lt $deadline) {
                 Start-Sleep -Milliseconds 100
-                if (Test-Path $nohupOut) { $content = [string](Get-Content $nohupOut -Raw) }
+                try { $content = Get-Content $nohupOut -Raw -ErrorAction Stop } catch { continue }
+                if ($content -match 'e2e-nohup-marker') { break }
             }
             $content | Should Match 'e2e-nohup-marker'
         } finally {
