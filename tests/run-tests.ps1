@@ -1,4 +1,4 @@
-# tests\run-tests.ps1
+﻿# tests\run-tests.ps1
 # 测试运行脚本 - 运行所有测试并估算覆盖率
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

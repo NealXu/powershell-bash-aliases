@@ -1,4 +1,4 @@
-# tests\test-core-compress.ps1 (compatible with Pester 3.4.0)
+﻿# tests\test-core-compress.ps1 (compatible with Pester 3.4.0)
 # Fix: Use explicit function calls to avoid PowerShell alias conflicts
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

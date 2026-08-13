@@ -1,4 +1,4 @@
-# bash-aliases.psm1
+﻿# bash-aliases.psm1
 # PowerShell Bash Aliases Module
 
 . $PSScriptRoot\args-parser.ps1

@@ -1,4 +1,4 @@
-# tests/test-core-utils.ps1
+﻿# tests/test-core-utils.ps1
 # Fix: Use explicit function calls and handle null path
 param(
     [string]$TestPath = $PWD

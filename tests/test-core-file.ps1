@@ -1,4 +1,4 @@
-# tests\test-core-file.ps1 (兼容 Pester 3.4.0)
+﻿# tests\test-core-file.ps1 (兼容 Pester 3.4.0)
 # 修复：使用显式函数调用避免PowerShell别名冲突
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

@@ -1,4 +1,4 @@
-# tests\test-bootstrap.ps1
+﻿# tests\test-bootstrap.ps1
 # 测试框架启动脚本 (兼容 Pester 3.4.0)
 
 # 检查 Pester 是否安装

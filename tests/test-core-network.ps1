@@ -1,4 +1,4 @@
-# tests\test-core-network.ps1 (兼容 Pester 3.4.0)
+﻿# tests\test-core-network.ps1 (兼容 Pester 3.4.0)
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 

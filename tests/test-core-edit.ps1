@@ -68,12 +68,71 @@ Describe "Build-VimArgs" {
 }
 
 Describe "vim without an installed vim" {
-    It "emits a vim-not-found error when Get-Command finds nothing" {
+    It "emits a no-editor-found error when Get-Command finds nothing" {
         InModuleScope bash-aliases {
             Mock Get-Command { $null }
-            $err = @(& vim 'x' 2>&1)
-            $err.Count | Should BeGreaterThan 0
-            ($err -join "`n") -match 'vim not found' | Should Be $true
+            $oldEditor = $env:EDITOR
+            if ($null -ne $oldEditor) { Remove-Item Env:EDITOR -Force }
+            try {
+                $err = @(& vim 'x' 2>&1)
+                $err.Count | Should BeGreaterThan 0
+                ($err -join "`n") -match 'no editor found' | Should Be $true
+            } finally {
+                if ($null -ne $oldEditor) { $env:EDITOR = $oldEditor }
+            }
+        }
+    }
+}
+
+Describe "Resolve-Editor fallback chain" {
+    It "falls back to code when vim is absent and code is present" {
+        InModuleScope bash-aliases {
+            Mock Get-Command -ParameterFilter { $Name -eq 'vim' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'code' } { [pscustomobject]@{ Source = 'C:\fake\code.exe' } }
+            Mock Get-Command -ParameterFilter { $Name -eq 'notepad' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'my-editor' } { $null }
+            $oldEditor = $env:EDITOR
+            if ($null -ne $oldEditor) { Remove-Item Env:EDITOR -Force }
+            try {
+                $result = Resolve-Editor
+                $result | Should Be 'C:\fake\code.exe'
+            } finally {
+                if ($null -ne $oldEditor) { $env:EDITOR = $oldEditor }
+            }
+        }
+    }
+
+    It "uses the editor from EDITOR when vim is absent" {
+        InModuleScope bash-aliases {
+            Mock Get-Command -ParameterFilter { $Name -eq 'vim' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'code' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'notepad' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'my-editor' } { [pscustomobject]@{ Source = 'C:\fake\my-editor.exe' } }
+            $oldEditor = $env:EDITOR
+            $env:EDITOR = 'my-editor'
+            try {
+                $result = Resolve-Editor
+                $result | Should Be 'C:\fake\my-editor.exe'
+            } finally {
+                if ($null -ne $oldEditor) { $env:EDITOR = $oldEditor } else { Remove-Item Env:EDITOR -Force -ErrorAction SilentlyContinue }
+            }
+        }
+    }
+
+    It "returns null when no editor is available" {
+        InModuleScope bash-aliases {
+            Mock Get-Command -ParameterFilter { $Name -eq 'vim' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'code' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'notepad' } { $null }
+            Mock Get-Command -ParameterFilter { $Name -eq 'my-editor' } { $null }
+            $oldEditor = $env:EDITOR
+            if ($null -ne $oldEditor) { Remove-Item Env:EDITOR -Force }
+            try {
+                $result = Resolve-Editor
+                $result | Should Be $null
+            } finally {
+                if ($null -ne $oldEditor) { $env:EDITOR = $oldEditor }
+            }
         }
     }
 }
