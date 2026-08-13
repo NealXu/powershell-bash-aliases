@@ -161,22 +161,27 @@ Describe "file command coverage" {
         @($out | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }).Count | Should Be 1
     }
 
-    It "reports a file symbolic link when creation is permitted" {
-        $target = Join-Path $script:fileRoot "file.txt"
-        $link = Join-Path $script:fileRoot "filelink.lnk"
-        $created = $false
-        try {
-            New-Item -ItemType SymbolicLink -Path $link -Target $target -ErrorAction Stop | Out-Null
-            $created = $true
-        } catch {
-            $created = $false
-        }
-        if ($created) {
-            $result = & $script:fileFunc $link
-            @($result | Where-Object { $_ -match 'symbolic link' }).Count | Should Be 1
-        } else {
-            $true | Should Be $true
-        }
+    # Pester 3.4.0 has no Set-ItResult; the only "Skipped" result path is the
+    # It -Skip switch, decided at invocation time. Probe symlink capability
+    # here (Describe body runs top-to-bottom) and skip when not permitted.
+    $script:symlinkPermitted = $false
+    $script:symlinkLink = Join-Path $script:fileRoot "filelink.lnk"
+    $script:symlinkTarget = Join-Path $script:fileRoot "file.txt"
+    try {
+        New-Item -ItemType SymbolicLink -Path $script:symlinkLink -Target $script:symlinkTarget -ErrorAction Stop | Out-Null
+        $script:symlinkPermitted = $true
+    } catch {
+        $script:symlinkPermitted = $false
+    }
+
+    It "reports a file symbolic link when creation is permitted" -Skip:(-not $script:symlinkPermitted) {
+        $result = & $script:fileFunc $script:symlinkLink
+        @($result | Where-Object { $_ -match 'symbolic link' }).Count | Should Be 1
+    }
+
+    It "shows usage with short -help" {
+        $result = & $script:fileFunc -help
+        (@($result -join '') -match 'Usage: file') | Should Be $true
     }
 }
 
