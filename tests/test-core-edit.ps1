@@ -71,6 +71,7 @@ Describe "vim without an installed vim" {
     It "emits a no-editor-found error when Get-Command finds nothing" {
         InModuleScope bash-aliases {
             Mock Get-Command { $null }
+            Mock Get-GitVimPath { $null }
             $oldEditor = $env:EDITOR
             if ($null -ne $oldEditor) { Remove-Item Env:EDITOR -Force }
             try {
@@ -91,6 +92,7 @@ Describe "Resolve-Editor fallback chain" {
             Mock Get-Command -ParameterFilter { $Name -eq 'code' } { [pscustomobject]@{ Source = 'C:\fake\code.exe' } }
             Mock Get-Command -ParameterFilter { $Name -eq 'notepad' } { $null }
             Mock Get-Command -ParameterFilter { $Name -eq 'my-editor' } { $null }
+            Mock Get-GitVimPath { $null }
             $oldEditor = $env:EDITOR
             if ($null -ne $oldEditor) { Remove-Item Env:EDITOR -Force }
             try {
@@ -108,6 +110,7 @@ Describe "Resolve-Editor fallback chain" {
             Mock Get-Command -ParameterFilter { $Name -eq 'code' } { $null }
             Mock Get-Command -ParameterFilter { $Name -eq 'notepad' } { $null }
             Mock Get-Command -ParameterFilter { $Name -eq 'my-editor' } { [pscustomobject]@{ Source = 'C:\fake\my-editor.exe' } }
+            Mock Get-GitVimPath { $null }
             $oldEditor = $env:EDITOR
             $env:EDITOR = 'my-editor'
             try {
@@ -119,12 +122,28 @@ Describe "Resolve-Editor fallback chain" {
         }
     }
 
+    It "prefers the Git-bundled vim over EDITOR/code when vim is not on PATH" {
+        InModuleScope bash-aliases {
+            Mock Get-Command -ParameterFilter { $Name -eq 'vim' } { $null }
+            Mock Get-GitVimPath { 'C:\fake\Git\usr\bin\vim.exe' }
+            $oldEditor = $env:EDITOR
+            if ($null -ne $oldEditor) { Remove-Item Env:EDITOR -Force }
+            try {
+                $result = Resolve-Editor
+                $result | Should Be 'C:\fake\Git\usr\bin\vim.exe'
+            } finally {
+                if ($null -ne $oldEditor) { $env:EDITOR = $oldEditor }
+            }
+        }
+    }
+
     It "returns null when no editor is available" {
         InModuleScope bash-aliases {
             Mock Get-Command -ParameterFilter { $Name -eq 'vim' } { $null }
             Mock Get-Command -ParameterFilter { $Name -eq 'code' } { $null }
             Mock Get-Command -ParameterFilter { $Name -eq 'notepad' } { $null }
             Mock Get-Command -ParameterFilter { $Name -eq 'my-editor' } { $null }
+            Mock Get-GitVimPath { $null }
             $oldEditor = $env:EDITOR
             if ($null -ne $oldEditor) { Remove-Item Env:EDITOR -Force }
             try {
@@ -133,6 +152,26 @@ Describe "Resolve-Editor fallback chain" {
             } finally {
                 if ($null -ne $oldEditor) { $env:EDITOR = $oldEditor }
             }
+        }
+    }
+}
+
+Describe "Get-GitVimPath" {
+    It "derives the vim path from the git install root" {
+        InModuleScope bash-aliases {
+            Mock Get-Command -ParameterFilter { $Name -eq 'git' } { [pscustomobject]@{ Source = 'C:\fake\Git\cmd\git.exe' } }
+            Mock Test-Path { $true }
+            $result = Get-GitVimPath
+            $result | Should Be 'C:\fake\Git\usr\bin\vim.exe'
+        }
+    }
+
+    It "returns null when git is absent and no known path exists" {
+        InModuleScope bash-aliases {
+            Mock Get-Command -ParameterFilter { $Name -eq 'git' } { $null }
+            Mock Test-Path { $false }
+            $result = Get-GitVimPath
+            $result | Should Be $null
         }
     }
 }

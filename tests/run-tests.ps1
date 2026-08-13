@@ -71,7 +71,7 @@ $functionCounts = @{
     "core-network.ps1" = 4 # curl, ping, netstat, wget
     "core-view.ps1" = 1   # less
     "core-system.ps1" = 6 # df, du, uptime, uname, hostname, yolo/yoloc
-    "core-edit.ps1" = 4   # Resolve-Editor, Build-VimArgs, vim, vi
+    "core-edit.ps1" = 5   # Get-GitVimPath, Resolve-Editor, Build-VimArgs, vim, vi
 }
 
 # 估算每个核心文件的测试覆盖函数数
@@ -84,7 +84,7 @@ $coveredFunctions = @{
     "core-network.ps1" = 4
     "core-view.ps1" = 1
     "core-system.ps1" = 5  # yolo/yoloc 未测试
-    "core-edit.ps1" = 4
+    "core-edit.ps1" = 5
 }
 
 $totalFunctions = 0
