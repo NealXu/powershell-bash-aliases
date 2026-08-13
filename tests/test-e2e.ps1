@@ -90,12 +90,18 @@ Describe "e2e: installed command smoke" {
             $nohupOut = Join-Path $dir 'nohup.out'
             $r = @(& $script:nohupFunc Write-Output 'e2e-nohup-marker' 2>&1)
             ($r -join "`n") -match 'Started background job' | Should Be $true
+            # Poll for the MARKER inside nohup.out, not just the file: the *>>
+            # redirection creates the file before the child's output is flushed,
+            # so Test-Path alone races an empty file (flaked under load).
+            # The [string] cast keeps an empty read (PS 5.1 returns a null whose
+            # -notmatch is falsy) from exiting the poll before output lands.
             $deadline = (Get-Date).AddSeconds(15)
-            while (-not (Test-Path $nohupOut) -and (Get-Date) -lt $deadline) {
-                Start-Sleep -Milliseconds 250
+            $content = ''
+            while ($content -notmatch 'e2e-nohup-marker' -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 100
+                if (Test-Path $nohupOut) { $content = [string](Get-Content $nohupOut -Raw) }
             }
-            Test-Path $nohupOut | Should Be $true
-            (Get-Content $nohupOut -Raw) -match 'e2e-nohup-marker' | Should Be $true
+            $content | Should Match 'e2e-nohup-marker'
         } finally {
             Pop-Location
             Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue

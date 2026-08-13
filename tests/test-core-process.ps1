@@ -211,7 +211,8 @@ Describe "bg" {
     }
 
     It "Resumes an existing background job without throwing" {
-        $job = Start-Job -ScriptBlock { Start-Sleep -Seconds 30 }
+        # Short sleep: bg never waits on the job; the process exits fast instead of lingering 30 s.
+        $job = Start-Job -ScriptBlock { Start-Sleep -Milliseconds 200 }
         try {
             & $script:module { param($j) $script:JobTable = @{ 'j1' = $j } } $job
             { & $script:bgFunc 1 } | Should Not Throw
