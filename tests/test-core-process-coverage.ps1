@@ -317,23 +317,31 @@ Describe "nohup" {
         }
     }
 
-    It "Starts a background job and registers it (nohup.out flush path uncovered)" {
+    It "Starts a background job and appends its output to nohup.out" {
         Reset-JobTable
-        $nohupOut = Join-Path $PWD 'nohup.out'
-        Remove-Item $nohupOut -Force -ErrorAction SilentlyContinue
-        $r = @(& $script:nohupFunc Write-Output 'hello-nohup' 2>&1)
-        ($r -join "`n") -match 'Started background job' | Should Be $true
-        (& $script:module { $script:JobTable.Count }) | Should BeGreaterThan 0
-        # The nohup.out flush path (core-process.ps1:369-375) is NOT exercised.
-        # The StateChanged action sets $job = $Event.MessageData, but nohup calls
-        # Register-ObjectEvent without -MessageData, so MessageData is $null and
-        # the Completed branch never runs (the job also never reaches Completed:
-        # it goes Blocked). Production defect, deliberately not fixed here; the
-        # assertions are relaxed to the started-output and JobTable count only.
-        Remove-Item $nohupOut -Force -ErrorAction SilentlyContinue
-        # Clean up the event subscription and completed jobs registered by nohup
-        Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event -Force -ErrorAction SilentlyContinue
-        Reset-JobTable
+        $tmp = Join-Path $env:TEMP ('nohup-flush-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        Push-Location $tmp
+        try {
+            $nohupOut = Join-Path $tmp 'nohup.out'
+            $r = @(& $script:nohupFunc Write-Output 'hello-nohup' 2>&1)
+            ($r -join "`n") -match 'Started background job' | Should Be $true
+            # The event action runs async: poll for nohup.out to be flushed.
+            $deadline = (Get-Date).AddSeconds(15)
+            while (-not (Test-Path $nohupOut) -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 250
+            }
+            Test-Path $nohupOut | Should Be $true
+            (Get-Content $nohupOut -Raw) -match 'hello-nohup' | Should Be $true
+        } finally {
+            Pop-Location
+            Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+            # Clean up event subscriptions and any jobs the function left behind
+            Get-EventSubscriber -ErrorAction SilentlyContinue | Unregister-Event -Force -ErrorAction SilentlyContinue
+            Get-Job | Stop-Job -ErrorAction SilentlyContinue
+            Get-Job | Remove-Job -Force -ErrorAction SilentlyContinue
+            Reset-JobTable
+        }
     }
 }
 

@@ -341,17 +341,22 @@ function nohup {
     $command = $parsed.Positional[0]
     $arguments = $parsed.Positional[1..($parsed.Positional.Count - 1)]
 
-    # Create output file
+    # Create output file (path captured at call time; the child writes to it
+    # directly, so it is immune to a later cd).
     $nohupOut = Join-Path $PWD 'nohup.out'
 
-    # Start the command as a PowerShell background job
+    # Start the command as a PowerShell background job. The child redirects ALL of
+    # its output straight into nohup.out (*>>) so nothing is left waiting in the
+    # job's output buffer. NOTE: the scriptblock parameters must not be named
+    # $args -- declaring a parameter named $args shadows the automatic variable
+    # and wedges the job in 'Blocked', from which Receive-Job cannot recover.
     $scriptBlock = {
-        param($cmd, $args)
-        & $cmd @args
+        param($cmd, $arguments, $outFile)
+        & $cmd @arguments *>> $outFile
     }
 
     try {
-        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $command, $arguments
+        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $command, $arguments, $nohupOut
 
         # Track job in our table
         $jobInfo = @{
@@ -365,13 +370,13 @@ function nohup {
         Write-Output "Job ID: $($job.Id)"
         Write-Output "Output appended to: $nohupOut"
 
-        # Capture output to nohup.out
-        Register-ObjectEvent -InputObject $job -EventName StateChanged -Action {
-            $job = $Event.MessageData
-            if ($job.State -eq 'Completed') {
-                $output = Receive-Job -Job $job -ErrorAction SilentlyContinue
-                $output | Out-File -FilePath (Join-Path $PWD 'nohup.out') -Append -Encoding UTF8
-                Remove-Job -Job $job -Force
+        # Clean up the job and its table entry once it reaches a terminal state.
+        Register-ObjectEvent -InputObject $job -EventName StateChanged -MessageData @{ Job = $job; Table = $script:JobTable } -Action {
+            $data = $Event.MessageData
+            $job = $data.Job
+            if ($job.State -in @('Completed', 'Failed', 'Stopped')) {
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+                $data.Table.Remove($job.Id)
             }
         } | Out-Null
 
