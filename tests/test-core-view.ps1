@@ -86,9 +86,9 @@ Describe "more" {
         $code -match "pattern" | Should Be $true
     }
 
-    It "Uses Out-Host -Paging for display" {
+    It "Uses Show-PagedOutput for display" {
         $code = Get-Content (Join-Path $scriptDir "..\core-view.ps1") -Raw
-        $code -match "Out-Host.*-Paging" | Should Be $true
+        $code -match "Show-PagedOutput" | Should Be $true
     }
 }
 

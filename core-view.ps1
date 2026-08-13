@@ -25,7 +25,7 @@ function less {
     } else {
         $content = Read-BashFileContent (Convert-BashPath $paths[0])
     }
-    $content | Out-Host -Paging
+    Show-PagedOutput $content
 }
 
 function more {
@@ -82,7 +82,6 @@ function more {
         $content = $content | Where-Object { $_ -match $pattern }
     }
 
-    # Use Out-Host -Paging for interactive paging
-    # This provides similar behavior to more in Unix
-    $content | Out-Host -Paging
+    # Interactive pager with arrow-key scrolling (see Show-PagedOutput)
+    Show-PagedOutput $content
 }

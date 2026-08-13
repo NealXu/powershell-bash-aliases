@@ -57,3 +57,48 @@ function Read-BashFileContent {
     if (-not $fullPath) { $fullPath = $Path }
     return [System.IO.File]::ReadAllLines($fullPath)
 }
+function Step-PageTop {
+    param([int]$Top, [int]$Total, [int]$PageSize, [string]$Key)
+    # Pure key -> next scroll position. Kept free of console I/O so it can be
+    # unit-tested; Show-PagedOutput drives it with live keystrokes.
+    switch ($Key) {
+        'UpArrow'   { return [Math]::Max(0, $Top - 1) }
+        'DownArrow' { return [Math]::Min($Total - 1, $Top + 1) }
+        'Spacebar'  { return [Math]::Min([Math]::Max(0, $Total - $PageSize), $Top + $PageSize) }
+        'PageDown'  { return [Math]::Min([Math]::Max(0, $Total - $PageSize), $Top + $PageSize) }
+        'PageUp'    { return [Math]::Max(0, $Top - $PageSize) }
+        'Home'      { return 0 }
+        'End'       { return [Math]::Max(0, $Total - $PageSize) }
+        default     { return $Top }
+    }
+}
+function Show-PagedOutput {
+    param([string[]]$Content)
+    # Interactive pager replacing Out-Host -Paging, which hard-codes
+    # <SPACE>/<CR>/Q and cannot bind arrow keys. Scrolls with Up/Down
+    # (line), PageUp/PageDown/Space (page), Home/End (start/end), Q (quit).
+    $lines = @($Content)
+    if ($lines.Count -eq 0) { return }
+
+    $pageSize = 24
+    try { $pageSize = [Math]::Max(1, $Host.UI.RawUI.WindowSize.Height - 2) } catch { }
+
+    $total = $lines.Count
+    if ($total -le $pageSize) {
+        foreach ($line in $lines) { Write-Host $line }
+        return
+    }
+
+    $top = 0
+    while ($true) {
+        [Console]::Clear()
+        $end = [Math]::Min($top + $pageSize - 1, $total - 1)
+        for ($i = $top; $i -le $end; $i++) { Write-Host $lines[$i] }
+        Write-Host ("-- ({0}-{1}/{2}) Up/Down:line  Space/PgDn:next  PgUp:prev  Home/End:top/bottom  Q:quit --" -f ($top + 1), ($end + 1), $total) -ForegroundColor DarkGray
+
+        $key = [Console]::ReadKey($true).Key.ToString()
+        if ($key -eq 'Q') { break }
+        $top = Step-PageTop -Top $top -Total $total -PageSize $pageSize -Key $key
+    }
+    Write-Host ''
+}

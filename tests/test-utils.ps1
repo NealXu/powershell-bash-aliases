@@ -194,3 +194,39 @@ Describe "Read-BashFileContent" {
         (Read-BashFileContent (Join-Path $rfTestDir "nope.txt")) | Should Be $null
     }
 }
+
+Describe "Step-PageTop" {
+    It "UpArrow clamps at top" {
+        Step-PageTop -Top 0 -Total 100 -PageSize 20 -Key 'UpArrow' | Should Be 0
+    }
+    It "UpArrow decrements" {
+        Step-PageTop -Top 5 -Total 100 -PageSize 20 -Key 'UpArrow' | Should Be 4
+    }
+    It "DownArrow increments" {
+        Step-PageTop -Top 5 -Total 100 -PageSize 20 -Key 'DownArrow' | Should Be 6
+    }
+    It "DownArrow clamps at last line" {
+        Step-PageTop -Top 99 -Total 100 -PageSize 20 -Key 'DownArrow' | Should Be 99
+    }
+    It "Spacebar pages down" {
+        Step-PageTop -Top 0 -Total 100 -PageSize 20 -Key 'Spacebar' | Should Be 20
+    }
+    It "Spacebar clamps at last page top" {
+        Step-PageTop -Top 80 -Total 100 -PageSize 20 -Key 'Spacebar' | Should Be 80
+    }
+    It "PageDown pages down" {
+        Step-PageTop -Top 0 -Total 100 -PageSize 20 -Key 'PageDown' | Should Be 20
+    }
+    It "PageUp pages up" {
+        Step-PageTop -Top 40 -Total 100 -PageSize 20 -Key 'PageUp' | Should Be 20
+    }
+    It "Home goes to top" {
+        Step-PageTop -Top 50 -Total 100 -PageSize 20 -Key 'Home' | Should Be 0
+    }
+    It "End goes to last page top" {
+        Step-PageTop -Top 0 -Total 100 -PageSize 20 -Key 'End' | Should Be 80
+    }
+    It "Unknown key keeps position" {
+        Step-PageTop -Top 30 -Total 100 -PageSize 20 -Key 'X' | Should Be 30
+    }
+}
