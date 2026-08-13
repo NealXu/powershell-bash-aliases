@@ -14,9 +14,14 @@
 . $PSScriptRoot\core-compress.ps1
 . $PSScriptRoot\core-edit.ps1
 
-# 强制覆盖 PowerShell 内置别名（移除别名，确保模块函数优先于别名）
-# 注意：必须用 "Alias:$a" 而非 "Global:Alias:$a" —— Global: 前缀在 Remove-Item
-# 路径里不合法，会静默失败导致别名残留、函数永远无法覆盖内置命令。
+# Best-effort removal of built-in aliases from MODULE scope. Module scope CANNOT
+# remove the global AllScope/ReadOnly built-in aliases (ls, cd, cat, ...) in
+# PS 5.1 - only the caller's GLOBAL scope can - so for those aliases this loop
+# is a silent no-op and Alias precedence still beats the exported functions.
+# The authoritative cleanup is the manifest's ScriptsToProcess
+# (alias-cleanup.ps1), which runs in the caller's session state before the
+# module loads. This loop is kept because it still removes non-AllScope aliases
+# and works on the dot-source path.
 $aliases = @('cd', 'ls', 'cat', 'rm', 'cp', 'mv', 'ps', 'kill', 'wget', 'sort', 'ping', 'curl', 'echo', 'env', 'diff')
 foreach ($a in $aliases) {
     Remove-Item "Alias:$a" -Force -ErrorAction SilentlyContinue
