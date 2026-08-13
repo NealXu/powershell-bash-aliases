@@ -261,7 +261,12 @@ Install-Module Pester -Force -Scope CurrentUser
 
 # 运行单个测试文件
 Invoke-Pester tests\test-core-file.ps1
+
+# 运行端到端验收测试（安装布局 -> manifest 导入 -> 命令冒烟）
+Invoke-Pester tests\test-e2e.ps1
 ```
+
+> run-tests.ps1 会自动收集 test-e2e.ps1。e2e 只操作 `$env:TEMP` 下的临时目录，不会触碰真实安装目录或 Profile。
 
 ## 贡献
 
