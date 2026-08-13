@@ -70,7 +70,7 @@ foreach ($InstallPath in $InstallPaths) {
 if ($AddToProfile) {
     $line = @"
 # Bash-aliases module - remove conflicting aliases before import
-foreach (`$a in @('ls','cat','rm','cp','mv','ps','kill','sort','ping','wget')) { Remove-Item Alias:`$a -Force -ErrorAction SilentlyContinue }
+foreach (`$a in @('cd','ls','cat','rm','cp','mv','ps','kill','sort','ping','wget','curl','echo','env','diff')) { Remove-Item Alias:`$a -Force -ErrorAction SilentlyContinue }
 Import-Module bash-aliases -Force -ErrorAction SilentlyContinue
 "@
     if (-not (Test-Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force | Out-Null }

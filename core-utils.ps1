@@ -1,6 +1,9 @@
 # core-utils.ps1
 # Utility commands module
 
+# Bash-style cd keeps the previous directory here (module scope).
+$script:PrevDir = $null
+
 function echo {
     param(
         [switch]$n,
@@ -874,5 +877,47 @@ function env {
         $newEnv.GetEnumerator() | Sort-Object Name | ForEach-Object {
             Write-Output "$($_.Key)=$($_.Value)"
         }
+    }
+}
+
+function cd {
+    param([string[]]$ArgList)
+    # Bash-style cd: `cd -` returns to the previous directory; `cd` / `cd ~`
+    # go home; `cd PATH` sets location, remembering the current one.
+    $target = $null
+    if ($ArgList.Count -gt 0) { $target = $ArgList[0] }
+
+    if ($target -eq '-') {
+        if (-not $script:PrevDir) {
+            Write-BashError -Command 'cd' -Message 'no previous directory'
+            return
+        }
+        $current = (Get-Location).Path
+        try {
+            Set-Location -Path $script:PrevDir -ErrorAction Stop
+            $script:PrevDir = $current
+        } catch {
+            Write-BashError -Command 'cd' -Message $_.Exception.Message
+        }
+        return
+    }
+
+    if ([string]::IsNullOrEmpty($target) -or $target -eq '~') {
+        $current = (Get-Location).Path
+        try {
+            Set-Location -Path $HOME -ErrorAction Stop
+            $script:PrevDir = $current
+        } catch {
+            Write-BashError -Command 'cd' -Message $_.Exception.Message
+        }
+        return
+    }
+
+    $current = (Get-Location).Path
+    try {
+        Set-Location -Path (Convert-BashPath $target) -ErrorAction Stop
+        $script:PrevDir = $current
+    } catch {
+        Write-BashError -Command 'cd' -Message $_.Exception.Message
     }
 }
