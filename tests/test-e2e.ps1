@@ -106,5 +106,12 @@ Describe "e2e: installed command smoke" {
     }
 }
 
-# --- Teardown: remove the temp install (runs after all Describes above) ---
+# --- Teardown: remove the temp install and unload the installed module copy ---
+# Must also Remove-Module the INSTALLED instance: leaving a second 'bash-aliases'
+# script module loaded breaks Pester 3.4 InModuleScope/Mock in later test files
+# ("Multiple Script modules named 'bash-aliases' are currently loaded"). Filter by
+# ModuleBase so only the installed copy is removed, never the repo module instance.
+Get-Module bash-aliases -ErrorAction SilentlyContinue |
+    Where-Object { $_.ModuleBase -eq $script:e2eInstall } |
+    Remove-Module -Force -ErrorAction SilentlyContinue
 Remove-Item $script:e2eInstall -Recurse -Force -ErrorAction SilentlyContinue
