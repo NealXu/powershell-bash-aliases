@@ -1,4 +1,4 @@
-﻿# tests\test-core-file.ps1 (兼容 Pester 3.4.0)
+# tests\test-core-file.ps1 (兼容 Pester 3.4.0)
 # 修复：使用显式函数调用避免PowerShell别名冲突
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -623,5 +623,10 @@ Describe "ls -t / -r / -rt sort options" {
         $out = @(& $script:lsFunc -l -a -t $sortDir)
         $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
         $names -join ',' | Should Be '.d.txt,b.txt,c.txt,a.txt'
+    }
+    It "-t -r as separate args equals -rt" {
+        $out = @(& $script:lsFunc -l -t -r $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be 'a.txt,c.txt,b.txt'
     }
 }

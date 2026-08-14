@@ -59,4 +59,9 @@ Describe "ll -t / -r / -rt sort options" {
         $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
         $names -join ',' | Should Be 'c.txt,b.txt,a.txt'
     }
+    It "-t -r as separate args equals -rt" {
+        $out = @(& $script:llFunc -t -r $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be 'a.txt,c.txt,b.txt'
+    }
 }
