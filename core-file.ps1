@@ -16,18 +16,24 @@
         'a' = @{ Long = 'all'; Type = 'switch' }
         'l' = @{ Long = 'long'; Type = 'switch' }
         'h' = @{ Long = 'human-readable'; Type = 'switch' }
+        't' = @{ Long = 'time'; Type = 'switch' }
+        'r' = @{ Long = 'reverse'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
     $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
-        return 'Usage: ls [-a] [-l] [-h] [--help] [PATH]'
+        return 'Usage: ls [-a] [-l] [-h] [-t] [-r] [--help] [PATH]'
     }
 
     $showAll = $parsed.Options['a'] -or $parsed.LongOptions['all']
     $longFormat = $parsed.Options['l'] -or $parsed.LongOptions['long']
     $humanReadable = $parsed.Options['h'] -or $parsed.LongOptions['human-readable']
+    $sortByTime = $parsed.Options['t'] -or $parsed.LongOptions['time']
+    $reverse = $parsed.Options['r'] -or $parsed.LongOptions['reverse']
+    $sortProp = if ($sortByTime) { 'LastWriteTime' } else { 'Name' }
+    $descending = if ($sortByTime) { -not $reverse } else { $reverse }
 
     $paths = $parsed.Positional
     if ($paths.Count -eq 0) { $paths = @('.') }
@@ -39,7 +45,7 @@
             Write-BashError -Command 'ls' -Message "cannot access '$Path'"
             continue
         }
-        $items = Get-ChildItem $Path -Force:$showAll | Sort-Object { $_.Name }
+        $items = Get-ChildItem $Path -Force:$showAll | Sort-Object $sortProp -Descending:$descending
         if (-not $showAll) { $items = $items | Where-Object { -not $_.Name.StartsWith('.') } }
         if ($longFormat) {
             # ANSI color codes (matching WSL dircolors defaults)
@@ -338,22 +344,28 @@ function ll {
     $spec = @{
         'a' = @{ Long = 'all'; Type = 'switch' }
         'h' = @{ Long = 'human-readable'; Type = 'switch' }
+        't' = @{ Long = 'time'; Type = 'switch' }
+        'r' = @{ Long = 'reverse'; Type = 'switch' }
         'help' = @{ Long = 'help'; Type = 'switch' }
     }
 
     $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
 
     if ($parsed.Options['help']) {
-        return 'Usage: ll [-a] [-h] [--help] [PATH] (equivalent to ls -la)'
+        return 'Usage: ll [-a] [-h] [-t] [-r] [--help] [PATH] (equivalent to ls -la)'
     }
 
     $showAll = $parsed.Options['a'] -or $parsed.LongOptions['all']
     $humanReadable = $parsed.Options['h'] -or $parsed.LongOptions['human-readable']
+    $sortByTime = $parsed.Options['t'] -or $parsed.LongOptions['time']
+    $reverse = $parsed.Options['r'] -or $parsed.LongOptions['reverse']
+    $sortProp = if ($sortByTime) { 'LastWriteTime' } else { 'Name' }
+    $descending = if ($sortByTime) { -not $reverse } else { $reverse }
 
     $path = if ($parsed.Positional.Count -gt 0) { $parsed.Positional[0] } else { '.' }
     $p = Convert-BashPath $path
 
-    $items = Get-ChildItem $p -Force:$showAll | Sort-Object { $_.Name }
+    $items = Get-ChildItem $p -Force:$showAll | Sort-Object $sortProp -Descending:$descending
     if (-not $showAll) { $items = $items | Where-Object { -not $_.Name.StartsWith('.') } }
 
     # ANSI color codes (matching WSL dircolors defaults)
