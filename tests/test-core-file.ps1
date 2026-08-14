@@ -577,3 +577,51 @@ Describe "realpath" {
         $result -match ":\\" | Should Be $true
     }
 }
+
+Describe "ls -t / -r / -rt sort options" {
+    BeforeAll {
+        $sortDir = "test-ls-sort-temp"
+        New-Item -ItemType Directory -Path $sortDir -Force | Out-Null
+        New-Item -ItemType File -Path "$sortDir\a.txt" -Force | Out-Null
+        New-Item -ItemType File -Path "$sortDir\b.txt" -Force | Out-Null
+        New-Item -ItemType File -Path "$sortDir\c.txt" -Force | Out-Null
+        (Get-Item "$sortDir\a.txt").LastWriteTime = Get-Date '2020-01-01'
+        (Get-Item "$sortDir\c.txt").LastWriteTime = Get-Date '2021-01-01'
+        (Get-Item "$sortDir\b.txt").LastWriteTime = Get-Date '2023-01-01'
+    }
+    AfterAll {
+        Remove-Item $sortDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    It "defaults to name ascending" {
+        $out = @(& $script:lsFunc -l $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be 'a.txt,b.txt,c.txt'
+    }
+    It "-t sorts by time, newest first" {
+        $out = @(& $script:lsFunc -l -t $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be 'b.txt,c.txt,a.txt'
+    }
+    It "-rt sorts by time reverse, oldest first" {
+        $out = @(& $script:lsFunc -l -rt $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be 'a.txt,c.txt,b.txt'
+    }
+    It "-r reverses name order" {
+        $out = @(& $script:lsFunc -l -r $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be 'c.txt,b.txt,a.txt'
+    }
+    It "long forms --time --reverse equal -rt" {
+        $out = @(& $script:lsFunc -l --time --reverse $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be 'a.txt,c.txt,b.txt'
+    }
+    It "-a -t includes hidden files and sorts newest first" {
+        New-Item -ItemType File -Path "$sortDir\.d.txt" -Force | Out-Null
+        (Get-Item "$sortDir\.d.txt").LastWriteTime = Get-Date '2024-01-01'
+        $out = @(& $script:lsFunc -l -a -t $sortDir)
+        $names = @($out | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[-1] })
+        $names -join ',' | Should Be '.d.txt,b.txt,c.txt,a.txt'
+    }
+}
