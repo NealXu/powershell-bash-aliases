@@ -22,21 +22,18 @@ function head {
     $lines = $parsed.Options['n']
     if (-not $lines) { $lines = 10 }
 
-    if ($parsed.Positional.Count -gt 0) {
-        $path = Convert-BashPath $parsed.Positional[0]
-        Read-BashFileContent $path | Select-Object -First ([int]$lines)
-    }
+    $in = Read-BashInput -Files $parsed.Positional -Stdin $input
+    $in.Data | Select-Object -First ([int]$lines)
 }
 function tail {
     param(
-        [switch]$f, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$f, [switch]$help
     )
 
     $allArgs = @()
     if ($f) { $allArgs += '-f' }
     if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
+    $allArgs += $args
 
     $spec = @{
         'n' = @{ Long = 'lines'; Type = 'value' }
@@ -54,16 +51,18 @@ function tail {
     if (-not $lines) { $lines = 10 }
     $follow = $parsed.Options['f'] -or $parsed.LongOptions['follow']
 
-    if ($parsed.Positional.Count -gt 0) {
+    if ($follow -and $parsed.Positional.Count -gt 0) {
         $path = Convert-BashPath $parsed.Positional[0]
-        if ($follow) { Get-Content $path -Wait -Encoding UTF8 }
-        else { Read-BashFileContent $path | Select-Object -Last ([int]$lines) }
+        Get-Content $path -Wait -Encoding UTF8
+    }
+    else {
+        $in = Read-BashInput -Files $parsed.Positional -Stdin $input
+        $in.Data | Select-Object -Last ([int]$lines)
     }
 }
 function wc {
     param(
-        [switch]$l, [switch]$w, [switch]$c, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$l, [switch]$w, [switch]$c, [switch]$help
     )
 
     $allArgs = @()
@@ -71,7 +70,7 @@ function wc {
     if ($w) { $allArgs += '-w' }
     if ($c) { $allArgs += '-c' }
     if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
+    $allArgs += $args
 
     $spec = @{
         'l' = @{ Long = 'lines'; Type = 'switch' }
@@ -90,28 +89,47 @@ function wc {
     $showWords = $parsed.Options['w'] -or $parsed.LongOptions['words']
     $showBytes = $parsed.Options['c'] -or $parsed.LongOptions['bytes']
 
-    foreach ($f in $parsed.Positional) {
-        $fp = Convert-BashPath $f
-        $content = Read-BashFileContent $fp
+    $in = Read-BashInput -Files $parsed.Positional -Stdin $input
+
+    if ($in.Source -eq 'file') {
+        foreach ($f in $parsed.Positional) {
+            $fp = Convert-BashPath $f
+            $content = Read-BashFileContent $fp
+            $lineCount = $content.Count
+            $wordCount = ($content | ForEach-Object { $_.Split(' ') } | Measure-Object).Count
+            $byteCount = ($content | Measure-Object -Property Length -Sum).Sum
+
+            if (-not $showLines -and -not $showWords -and -not $showBytes) {
+                Write-Output "$lineCount $wordCount $byteCount $f"
+            } else {
+                $out = ''
+                if ($showLines) { $out += "$lineCount " }
+                if ($showWords) { $out += "$wordCount " }
+                if ($showBytes) { $out += "$byteCount " }
+                Write-Output "$out$f"
+            }
+        }
+    }
+    else {
+        $content = $in.Data
         $lineCount = $content.Count
         $wordCount = ($content | ForEach-Object { $_.Split(' ') } | Measure-Object).Count
         $byteCount = ($content | Measure-Object -Property Length -Sum).Sum
 
         if (-not $showLines -and -not $showWords -and -not $showBytes) {
-            Write-Output "$lineCount $wordCount $byteCount $f"
+            Write-Output "$lineCount $wordCount $byteCount"
         } else {
             $out = ''
             if ($showLines) { $out += "$lineCount " }
             if ($showWords) { $out += "$wordCount " }
             if ($showBytes) { $out += "$byteCount " }
-            Write-Output "$out$f"
+            Write-Output "$out"
         }
     }
 }
 function sort {
     param(
-        [switch]$n, [switch]$r, [switch]$u, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$n, [switch]$r, [switch]$u, [switch]$help
     )
 
     $allArgs = @()
@@ -119,7 +137,7 @@ function sort {
     if ($r) { $allArgs += '-r' }
     if ($u) { $allArgs += '-u' }
     if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
+    $allArgs += $args
 
     $spec = @{
         'n' = @{ Long = 'numeric'; Type = 'switch' }
@@ -138,11 +156,8 @@ function sort {
     $reverse = $parsed.Options['r'] -or $parsed.LongOptions['reverse']
     $unique = $parsed.Options['u'] -or $parsed.LongOptions['unique']
 
-    if ($parsed.Positional.Count -gt 0) {
-        $content = Read-BashFileContent (Convert-BashPath $parsed.Positional[0])
-    } else {
-        $content = $input
-    }
+    $in = Read-BashInput -Files $parsed.Positional -Stdin $input
+    $content = $in.Data
 
     $sorted = if ($numeric) { $content | Sort-Object {[double]$_} } else { $content | Sort-Object }
     if ($reverse) { $sorted = $sorted | Sort-Object -Descending }

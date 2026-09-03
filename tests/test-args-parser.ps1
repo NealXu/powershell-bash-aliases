@@ -2,6 +2,7 @@
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "..\args-parser.ps1")
+. (Join-Path $scriptDir "..\utils.ps1")
 
 Describe "Parse-BashArgs" {
     It "Returns empty result for empty input" {
@@ -88,5 +89,31 @@ Describe "Write-BashError" {
         # Verify function exists and format is correct
         $errorMsg = "ls: cannot access 'file'"
         $errorMsg.Substring(0,3) | Should Be "ls:"
+    }
+}
+Describe "Read-BashInput" {
+    BeforeAll {
+        $testFile = "test-rbi.txt"
+        Set-Content -Path $testFile -Value "r1", "r2", "r3" -Encoding UTF8
+    }
+    AfterAll {
+        Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+    }
+    It "Returns file source when files given" {
+        $result = Read-BashInput -Files @($testFile) -Stdin $null
+        $result.Source | Should Be 'file'
+        $result.Data.Count | Should Be 3
+        $result.Data[0] | Should Be "r1"
+    }
+    It "Returns pipeline source from args" {
+        $result = Read-BashInput -Files @() -Stdin @("x", "y")
+        $result.Source | Should Be 'pipeline'
+        $result.Data.Count | Should Be 2
+        $result.Data[1] | Should Be "y"
+    }
+    It "Returns none source when no input" {
+        $result = Read-BashInput -Files @() -Stdin $null
+        $result.Source | Should Be 'none'
+        $result.Data.Count | Should Be 0
     }
 }

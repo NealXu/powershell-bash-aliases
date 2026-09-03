@@ -1,71 +1,104 @@
 function grep {
     param(
-        [switch]$i, [switch]$v, [switch]$n, [switch]$c, [switch]$l, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$i, [switch]$v, [switch]$n, [switch]$c, [switch]$l, [switch]$help
     )
 
-    $allArgs = @()
-    if ($i) { $allArgs += '-i' }
-    if ($v) { $allArgs += '-v' }
-    if ($n) { $allArgs += '-n' }
-    if ($c) { $allArgs += '-c' }
-    if ($l) { $allArgs += '-l' }
-    if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
+    begin {
+        $pipelineLines = [System.Collections.ArrayList]@()
+        $allArgs = @()
+        if ($i) { $allArgs += '-i' }
+        if ($v) { $allArgs += '-v' }
+        if ($n) { $allArgs += '-n' }
+        if ($c) { $allArgs += '-c' }
+        if ($l) { $allArgs += '-l' }
+        if ($help) { $allArgs += '-help' }
+        $allArgs += $args
 
-    $spec = @{
-        'i' = @{ Long = 'ignore-case'; Type = 'switch' }
-        'v' = @{ Long = 'invert-match'; Type = 'switch' }
-        'n' = @{ Long = 'line-number'; Type = 'switch' }
-        'c' = @{ Long = 'count'; Type = 'switch' }
-        'l' = @{ Long = 'files-with-matches'; Type = 'switch' }
-        'help' = @{ Long = 'help'; Type = 'switch' }
-    }
-
-    $parsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
-
-    if ($parsed.Options['help']) {
-        return 'Usage: grep [-i] [-v] [-n] [-c] [-l] [--help] PATTERN [FILE]...'
-    }
-
-    $ignoreCase = $parsed.Options['i'] -or $parsed.LongOptions['ignore-case']
-    $invertMatch = $parsed.Options['v'] -or $parsed.LongOptions['invert-match']
-    $showLineNumber = $parsed.Options['n'] -or $parsed.LongOptions['line-number']
-    $onlyCount = $parsed.Options['c'] -or $parsed.LongOptions['count']
-    $onlyFiles = $parsed.Options['l'] -or $parsed.LongOptions['files-with-matches']
-
-    if ($parsed.Positional.Count -eq 0) {
-        Write-BashError -Command 'grep' -Message 'missing pattern'
-        return
-    }
-
-    $pattern = $parsed.Positional[0]
-    $files = $parsed.Positional[1..($parsed.Positional.Count - 1)]
-
-    foreach ($p in $files) {
-        $fp = Convert-BashPath $p
-        if (-not (Test-Path $fp)) {
-            Write-BashError -Command 'grep' -Message "cannot access '$p'"
-            continue
+        $spec = @{
+            'i' = @{ Long = 'ignore-case'; Type = 'switch' }
+            'v' = @{ Long = 'invert-match'; Type = 'switch' }
+            'n' = @{ Long = 'line-number'; Type = 'switch' }
+            'c' = @{ Long = 'count'; Type = 'switch' }
+            'l' = @{ Long = 'files-with-matches'; Type = 'switch' }
+            'help' = @{ Long = 'help'; Type = 'switch' }
         }
 
-        $content = Read-BashFileContent $fp
-        $foundMatches = @()
-        $lineNum = 1
+        $script:grepParsed = Parse-BashArgs -ArgsArray $allArgs -OptionSpec $spec
+        $script:grepIgnoreCase = $script:grepParsed.Options['i'] -or $script:grepParsed.LongOptions['ignore-case']
+        $script:grepInvertMatch = $script:grepParsed.Options['v'] -or $script:grepParsed.LongOptions['invert-match']
+        $script:grepShowLineNumber = $script:grepParsed.Options['n'] -or $script:grepParsed.LongOptions['line-number']
+        $script:grepOnlyCount = $script:grepParsed.Options['c'] -or $script:grepParsed.LongOptions['count']
+        $script:grepOnlyFiles = $script:grepParsed.Options['l'] -or $script:grepParsed.LongOptions['files-with-matches']
+        $script:grepPattern = if ($script:grepParsed.Positional.Count -gt 0) { $script:grepParsed.Positional[0] } else { $null }
+        $script:grepFiles = @()
+        if ($script:grepParsed.Positional.Count -gt 1) {
+            $script:grepFiles = @($script:grepParsed.Positional[1..($script:grepParsed.Positional.Count - 1)])
+        }
+    }
 
-        foreach ($line in $content) {
-            $isMatch = if ($ignoreCase) { $line -imatch $pattern } else { $line -cmatch $pattern }
-            if ($isMatch -and -not $invertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
-            elseif (-not $isMatch -and $invertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
-            $lineNum++
+    process {
+        if ($null -ne $_) {
+            [void]$pipelineLines.Add("$_")
+        }
+    }
+
+    end {
+        if ($script:grepParsed.Options['help']) {
+            return 'Usage: grep [-i] [-v] [-n] [-c] [-l] [--help] PATTERN [FILE]...'
         }
 
-        if ($onlyCount) { Write-Output "${fp}: $($foundMatches.Count)" }
-        elseif ($onlyFiles) { if ($foundMatches.Count -gt 0) { Write-Output $fp } }
-        else {
-            foreach ($m in $foundMatches) {
-                if ($showLineNumber) { Write-Output "${fp}:$($m.Num):$($m.Line)" }
-                else { Write-Output "${fp}:$($m.Line)" }
+        if ($null -eq $script:grepPattern) {
+            Write-BashError -Command 'grep' -Message 'missing pattern'
+            return
+        }
+
+        if ($script:grepFiles.Count -gt 0) {
+            foreach ($p in $script:grepFiles) {
+                $fp = Convert-BashPath $p
+                if (-not (Test-Path $fp)) {
+                    Write-BashError -Command 'grep' -Message "cannot access '$p'"
+                    continue
+                }
+
+                $content = Read-BashFileContent $fp
+                $foundMatches = @()
+                $lineNum = 1
+
+                foreach ($line in $content) {
+                    $isMatch = if ($script:grepIgnoreCase) { $line -imatch $script:grepPattern } else { $line -cmatch $script:grepPattern }
+                    if ($isMatch -and -not $script:grepInvertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
+                    elseif (-not $isMatch -and $script:grepInvertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
+                    $lineNum++
+                }
+
+                if ($script:grepOnlyCount) { Write-Output "${fp}: $($foundMatches.Count)" }
+                elseif ($script:grepOnlyFiles) { if ($foundMatches.Count -gt 0) { Write-Output $fp } }
+                else {
+                    foreach ($m in $foundMatches) {
+                        if ($script:grepShowLineNumber) { Write-Output "${fp}:$($m.Num):$($m.Line)" }
+                        else { Write-Output "${fp}:$($m.Line)" }
+                    }
+                }
+            }
+        }
+        elseif ($pipelineLines.Count -gt 0) {
+            $foundMatches = @()
+            $lineNum = 1
+
+            foreach ($line in $pipelineLines) {
+                $isMatch = if ($script:grepIgnoreCase) { $line -imatch $script:grepPattern } else { $line -cmatch $script:grepPattern }
+                if ($isMatch -and -not $script:grepInvertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
+                elseif (-not $isMatch -and $script:grepInvertMatch) { $foundMatches += @{ Line = $line; Num = $lineNum } }
+                $lineNum++
+            }
+
+            if ($script:grepOnlyCount) { Write-Output "$($foundMatches.Count)" }
+            elseif ($script:grepOnlyFiles) { if ($foundMatches.Count -gt 0) { Write-Output "stdin" } }
+            else {
+                foreach ($m in $foundMatches) {
+                    if ($script:grepShowLineNumber) { Write-Output "$($m.Num):$($m.Line)" }
+                    else { Write-Output $m.Line }
+                }
             }
         }
     }

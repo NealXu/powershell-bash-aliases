@@ -180,3 +180,42 @@ Describe "which parameter tests" {
         $result | Should Be $null
     }
 }
+
+Describe "grep pipeline input" {
+    It "Matches pattern from pipeline" {
+        $result = @("hello world", "foo bar") | grep 'hello'
+        $result | Should Be "hello world"
+    }
+
+    It "Counts matches from pipeline with -c" {
+        $result = @("hello", "hello", "world") | grep -c 'hello'
+        $result | Should Be "2"
+    }
+
+    It "Case-insensitive pipeline match with -i" {
+        $result = @("HELLO", "world") | grep -i 'hello'
+        $result | Should Be "HELLO"
+    }
+
+    It "Inverts pipeline match with -v" {
+        $result = @("hello", "world") | grep -v 'hello'
+        $result | Should Be "world"
+    }
+
+    It "Shows line numbers from pipeline with -n" {
+        $result = @("hello", "world") | grep -n 'hello'
+        $result | Should Be "1:hello"
+    }
+
+    It "Handles -l with pipeline input" {
+        $result = @("hello", "world") | grep -l 'hello'
+        $result | Should Be "stdin"
+    }
+
+    It "Handles multi-line pipeline input" {
+        $result = @("apple pie", "banana split", "apple juice", "cherry") | grep 'apple'
+        $result.Count | Should Be 2
+        $result[0] | Should Be "apple pie"
+        $result[1] | Should Be "apple juice"
+    }
+}

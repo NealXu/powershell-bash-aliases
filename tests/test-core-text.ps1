@@ -363,3 +363,41 @@ Describe "patch" {
         $code -match '\^---\\s\+' | Should Be $true
     }
 }
+
+Describe "head pipeline input" {
+    It "Reads from pipeline" {
+        $result = @("l1", "l2", "l3", "l4", "l5") | & $script:headFunc -n 2
+        $result.Count | Should Be 2
+        $result[0] | Should Be "l1"
+        $result[1] | Should Be "l2"
+    }
+}
+
+Describe "tail pipeline input" {
+    It "Reads from pipeline" {
+        $result = @("l1", "l2", "l3", "l4", "l5") | & $script:tailFunc -n 2
+        $result.Count | Should Be 2
+        $result[0] | Should Be "l4"
+        $result[1] | Should Be "l5"
+    }
+}
+
+Describe "wc pipeline input" {
+    It "Counts lines from pipeline" {
+        $result = @("a", "b", "c") | & $script:wcFunc -l
+        $result -match "^\s*3" | Should Be $true
+    }
+}
+
+Describe "sort pipeline input" {
+    It "Sorts from pipeline" {
+        $result = @("zebra", "apple", "banana") | & $script:sortFunc
+        $result[0] | Should Be "apple"
+        $result[1] | Should Be "banana"
+        $result[2] | Should Be "zebra"
+    }
+    It "Sorts reverse from pipeline" {
+        $result = @("apple", "banana", "zebra") | & $script:sortFunc -r
+        $result[0] | Should Be "zebra"
+    }
+}

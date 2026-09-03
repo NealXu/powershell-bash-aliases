@@ -180,6 +180,34 @@ function Get-PipelineInput {
     return @{ Source = 'none' }
 }
 
+function Read-BashInput {
+    # Unified input source for filter commands. Commands call this with their
+    # parsed positional File paths and the $input pipeline enumerator, then
+    # process the returned .Data lines. Handles the common "file OR stdin"
+    # decision so each command does not duplicate the branching boilerplate.
+    param(
+        [string[]]$Files,
+        [object]$Stdin
+    )
+
+    if ($Files -and $Files.Count -gt 0) {
+        $out = @()
+        foreach ($f in $Files) {
+            $fp = Convert-BashPath $f
+            if (Test-Path $fp) {
+                $out += @(Read-BashFileContent $fp)
+            }
+        }
+        return @{ Source = 'file'; Data = $out; Paths = $Files }
+    }
+
+    $p = @($Stdin | Where-Object { $null -ne $_ })
+    if ($p.Count -gt 0) {
+        return @{ Source = 'pipeline'; Data = $p; Paths = @() }
+    }
+    return @{ Source = 'none'; Data = @(); Paths = @() }
+}
+
 function Write-BashError {
     param(
         [string]$Command,

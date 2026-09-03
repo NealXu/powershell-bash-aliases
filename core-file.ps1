@@ -102,14 +102,13 @@
 }
 function cat {
     param(
-        [switch]$n, [switch]$help,
-        [Parameter(ValueFromRemainingArguments=$true)][string[]]$ArgList
+        [switch]$n, [switch]$help
     )
 
     $allArgs = @()
     if ($n) { $allArgs += '-n' }
     if ($help) { $allArgs += '-help' }
-    $allArgs += $ArgList
+    $allArgs += $args
 
     $spec = @{
         'n' = @{ Long = 'number'; Type = 'switch' }
@@ -124,20 +123,25 @@ function cat {
 
     $showNumbers = $parsed.Options['n'] -or $parsed.LongOptions['number']
 
-    $lineNum = 1
-    foreach ($p in $parsed.Positional) {
-        $fp = Convert-BashPath $p
-        if (-not (Test-Path $fp)) {
-            Write-BashError -Command 'cat' -Message "cannot access '$fp'"
-            continue
-        }
-        Read-BashFileContent $fp | ForEach-Object {
-            if ($showNumbers) {
-                Write-Output "$lineNum $_"
-                $lineNum++
-            } else {
-                Write-Output $_
+    $in = Read-BashInput -Files $parsed.Positional -Stdin $input
+    $content = @($in.Data)
+
+    # Preserve bash behavior: emit "cannot access" for files that do not exist.
+    if ($in.Source -eq 'file') {
+        foreach ($candidate in $parsed.Positional) {
+            if (-not (Test-Path (Convert-BashPath $candidate))) {
+                Write-BashError -Command 'cat' -Message "cannot access '$candidate'"
             }
+        }
+    }
+
+    $lineNum = 1
+    foreach ($line in $content) {
+        if ($showNumbers) {
+            Write-Output "$lineNum $line"
+            $lineNum++
+        } else {
+            Write-Output $line
         }
     }
 }

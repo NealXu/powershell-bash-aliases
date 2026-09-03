@@ -630,3 +630,16 @@ Describe "ls -t / -r / -rt sort options" {
         $names -join ',' | Should Be 'a.txt,c.txt,b.txt'
     }
 }
+
+Describe "cat pipeline input" {
+    It "Reads from pipeline" {
+        $result = @("p1", "p2", "p3") | & $script:catFunc
+        $result.Count | Should Be 3
+        $result[0] | Should Be "p1"
+    }
+    It "Numbers pipeline lines with -n" {
+        $result = @("x", "y") | & $script:catFunc -n
+        $result.Count | Should Be 2
+        $result[0] -match "^1 " | Should Be $true
+    }
+}
