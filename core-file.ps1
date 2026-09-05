@@ -171,36 +171,45 @@ function rm {
 
     $recursive = $parsed.Options['r'] -or $parsed.LongOptions['recursive']
     $force = $parsed.Options['f'] -or $parsed.LongOptions['force']
+    $anyError = $false
 
     foreach ($p in $parsed.Positional) {
         $fp = Convert-BashPath $p
         $fp = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($fp)
         if (-not (Test-Path $fp)) {
-            if (-not $force) { Write-BashError -Command 'rm' -Message "cannot remove '$fp'" }
+            if (-not $force) { Write-BashError -Command 'rm' -Message "cannot remove '$fp'"; $anyError = $true }
             continue
         }
         $item = Get-Item $fp
         if ($item -is [System.IO.DirectoryInfo] -and -not $recursive) {
             Write-BashError -Command 'rm' -Message "'$fp' is a directory"
+            $anyError = $true
             continue
         }
         if ($item -is [System.IO.DirectoryInfo]) {
-            # Use .NET for reliable recursive delete (handles read-only, .git objects)
-            foreach ($fi in [System.IO.Directory]::GetFiles($fp, '*', [System.IO.SearchOption]::AllDirectories)) {
-                try { [System.IO.File]::SetAttributes($fi, 'Normal') } catch {}
+            # Clear read-only attributes first (e.g. .git object files), then do a
+            # single recursive delete. Verify with Test-Path instead of trusting the
+            # exception, so a locked/blocked directory reports a bash-style error
+            # instead of failing silently.
+            $delError = $null
+            try {
+                foreach ($fi in [System.IO.Directory]::GetFiles($fp, '*', [System.IO.SearchOption]::AllDirectories)) {
+                    try { [System.IO.File]::SetAttributes($fi, 'Normal') } catch {}
+                }
+                [System.IO.Directory]::Delete($fp, $true)
+            } catch {
+                $delError = $_.Exception.Message
             }
-            foreach ($fi in [System.IO.Directory]::GetFiles($fp, '*', [System.IO.SearchOption]::AllDirectories)) {
-                try { [System.IO.File]::Delete($fi) } catch {}
+            if (Test-Path $fp) {
+                Write-BashError -Command 'rm' -Message "cannot remove '$fp': $delError"
+                $anyError = $true
             }
-            foreach ($di in ([System.IO.Directory]::GetDirectories($fp, '*', [System.IO.SearchOption]::AllDirectories) | Sort-Object { $_.Length } -Descending)) {
-                try { [System.IO.Directory]::Delete($di, $false) } catch {}
-            }
-            try { [System.IO.Directory]::Delete($fp, $true) } catch {}
         } else {
             if ($force -and (Get-Item $fp).IsReadOnly) { (Get-Item $fp).IsReadOnly = $false }
             Remove-Item $fp -Force:$force
         }
     }
+    $global:LASTEXITCODE = if ($anyError) { 1 } else { 0 }
 }
 function mkdir {
     param(

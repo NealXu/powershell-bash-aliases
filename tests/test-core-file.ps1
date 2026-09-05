@@ -80,6 +80,38 @@ Describe "rm" {
         & $script:rmFunc -r $dir
         Test-Path $dir | Should Be $false
     }
+    It "Reports cannot remove and sets exit code 1 when recursive delete is blocked" {
+        $dir = Join-Path $env:TEMP "bashalias-rm-locked-$PID"
+        Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path (Join-Path $dir 'sub') -Force | Out-Null
+        $lockedFile = Join-Path $dir 'sub\locked.txt'
+        Set-Content -Path $lockedFile -Value 'x' -Encoding UTF8
+        # Hold an exclusive handle on a file inside the tree so the recursive
+        # delete cannot complete, like a process locking a real project dir.
+        $handle = [System.IO.File]::Open($lockedFile, 'Open', 'Read', 'None')
+        try {
+            $out = & $script:rmFunc -fr $dir 2>&1
+            ($out | Out-String) | Should Match 'rm: cannot remove'
+            $global:LASTEXITCODE | Should Be 1
+            Test-Path $dir | Should Be $true
+        }
+        finally {
+            $handle.Dispose()
+            Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    It "Removes read-only file tree silently and sets exit code 0" {
+        $dir = Join-Path $env:TEMP "bashalias-rm-ro-$PID"
+        Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path (Join-Path $dir 'sub') -Force | Out-Null
+        $roFile = Join-Path $dir 'sub\ro.txt'
+        Set-Content -Path $roFile -Value 'x' -Encoding UTF8
+        Set-ItemProperty -Path $roFile -Name IsReadOnly -Value $true
+        $out = & $script:rmFunc -fr $dir 2>&1
+        ($out | Out-String) | Should Not Match 'cannot remove'
+        Test-Path $dir | Should Be $false
+        $global:LASTEXITCODE | Should Be 0
+    }
 }
 
 Describe "mkdir" {
